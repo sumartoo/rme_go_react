@@ -412,6 +412,89 @@ LAB_PASSWORD=... scripts/import-lab-perujuk-otc.sh            # migration 030_pe
 LAB_PASSWORD=... scripts/import-lab-perujuk-otc.sh --replace
 ```
 
+## Master Data › Pasien (MCU patients)
+
+`/master-data/pasien` lists the MCU patients (`refpasien`, ~7.3k rows), separate from the clinic patients of Master Data Klinik › Pasien (`refmpasien`). Columns: No RM, Nama, Jenis Kelamin, Tanggal Lahir, No Telp, No Hp, Alamat, Perusahaan (name from `refcompany`), NIK, Email, Departmen, Posisi. The list is paged, searched (No RM, name, NIK, address, company) and sorted in the database, by No RM by default. Soft-deleted rows (`isdeleted`) are hidden.
+
+**+ Add** and the pencil open a form; Nama, Jenis Kelamin (`L`/`P`) and Perusahaan are required. A new patient gets the next No RM of today, `YYMMDD` (Asia/Jakarta) plus a 4-digit sequence, like lab; No RM is not editable. No RM is not unique in lab (13 numbers appear twice), so there is no unique constraint. There is no delete, and the original screen's **Upload** button is not built yet.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-pasien-mcu.sh            # migration 042_pasien_mcu.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-pasien-mcu.sh --replace
+```
+
+## Master Data › Perusahaan
+
+`/master-data/perusahaan` lists the client companies (`refcompany`: Kode Perusahaan, Nama Perusahaan, Alamat), sorted by code like the original screen. **+ Add** and the pencil open a form with Kode Perusahaan (required, at most 10 characters, unique), Nama Perusahaan (required, 255), Alamat (255), Contact Person (100), Email (100), Telepon (30), Fax (30) and PPN (`isvat`: Ya = `1`, Tidak = `0`, or empty, as most rows in lab are). There is no delete. The code is unique in lab, so the app enforces it (`409` with a field error when taken).
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-perusahaan.sh            # migration 041_perusahaan.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-perusahaan.sh --replace
+```
+
+## Master Data › Lab Master
+
+`/master-data/lab-master` lists the groups of lab examinations (`reflabmaster`: Lab Master Code, Lab Master Name), sorted by code like the original screen. **+ Add** and the pencil open a form with Lab Master Code (at most 20 characters) and Lab Master Name (at most 50); saves record `createby`/`modifiedby` and the time. There is no delete, and soft-deleted rows (`isdeleted`) are hidden. lab has no unique constraint on the code, so neither does the app.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-lab-master.sh            # migration 043_lab_master.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-lab-master.sh --replace
+```
+
+## Master Data › Dokter (MCU doctors)
+
+`/master-data/dokter` lists the MCU doctors (`refdoctor`: Dokter Code, Dokter Name, Dokter Master Name from `refdoctormaster`, Percentage Fee), sorted by code like the original screen. They are separate from the clinic doctors of Master Data Klinik › Dokter (`refdokter`). **+ Add** and the pencil open a form with Dokter Code (required on add, at most 20 characters, unique; it is the primary key, so it cannot be changed later), Dokter Name (required, 50), Dokter Master (required, a list) and Percentage Fee (optional, 0–100). There is no delete.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-dokter-mcu.sh            # migration 048_dokter_mcu.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-dokter-mcu.sh --replace
+```
+
+## Master Data › Dokter Master
+
+`/master-data/dokter-master` lists the kinds of MCU doctor (`refdoctormaster`: Dokter Master Name), sorted by name like the original screen. They are separate from the clinic doctors (`refdokter`). **+ Add** and the pencil open a one-field form (Dokter Master Name, at most 50 characters). There is no delete.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-dokter-master.sh            # migration 047_dokter_master.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-dokter-master.sh --replace
+```
+
+## Master Data › Non Lab
+
+`/master-data/non-lab` lists the services sold with an MCU that are not lab examinations (`refnonlab`: ID, Non Lab Name, Price), ordered by ID with 20 rows per page like the original screen. **+ Add** and the pencil open a form with Non Lab Name (required, at most 100 characters) and Price (optional, from 0); saves record `createby`/`modifiedby` and the time. There is no delete, and soft-deleted rows (`isdeleted`) are hidden.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-non-lab.sh            # migration 046_non_lab.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-non-lab.sh --replace
+```
+
+## Master Data › Lab
+
+`/master-data/lab` lists the lab examinations (`reflab`, 593 rows): Lab Code (`labid`), Lab Master, Sub Master Name (from `reflabsubmaster` and `reflabmaster`), Lab (`labname`) and Status, ordered by Lab Code like the original screen. Here `isdeleted` is the Status: `true` = Non Active (183 rows in lab); those rows stay listed. **+ Add** and the pencil open a form with Sub Master (grouped by Lab Master), Lab (at most 50 characters), Kode (`labcode`, at most 50; empty = same as Lab, as in most of lab), Price, Fee (0–100; 15 for a new examination, like lab's default) and Status. Deactivating records `deletedby`/`deleteddate`, activating clears them; saves also record `createby`/`modifiedby`. There is no delete.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-lab.sh            # migration 045_lab.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-lab.sh --replace
+```
+
+## Master Data › Lab Sub Master
+
+`/master-data/lab-sub-master` lists the subgroups of lab examinations (`reflabsubmaster`: Lab Master, Sub Master Code, Sub Master Name), ordered by Lab Master and then entry order like the original screen. The Lab Master column shows the name from `reflabmaster`. **+ Add** and the pencil open a form with Lab Master (a list of the Lab Masters), Sub Master Code (at most 20 characters) and Sub Master Name (at most 50); saves record `createby`/`modifiedby` and the time. There is no delete, and soft-deleted rows (`isdeleted`) are hidden.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-lab-sub-master.sh            # migration 044_lab_sub_master.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-lab-sub-master.sh --replace
+```
+
+## Master Data › MCU
+
+`/master-data/mcu` lists the MCU examination groups (`refmastermcu`: ID, Kode Mcu, Nama Mcu), like the original screen. **+ Add** and the pencil open a form with Kode Mcu (at most 10 characters) and Nama Mcu (at most 30). There is no delete. lab has no unique constraint on the code, so neither does the app.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-master-mcu.sh            # migration 040_master_mcu.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-master-mcu.sh --replace
+```
+
 ## Front Office Klinik › Pendaftaran Pasien (patient registrations)
 
 `/front-office-klinik/pendaftaran-pasien` lists registrations (`trxpendaftaran`, 344k rows in lab) with server-side paging, search and sorting, like Pasien. The columns are No Pendaftaran, No Antrian, No Antrian Poli, Tanggal Waktu, Pelayanan, Status Kunjungan, No RM, Nama, Tanggal Lahir, Umur, Alamat, Cabang, Pakai Kartu, Total Point and Action.
@@ -968,6 +1051,15 @@ backend/
   internal/distributor        drug distributors (/api/distributor)
   internal/principal          drug principals (/api/principal)
   internal/icd                ICD-X codes with server-side paging (/api/icd)
+  internal/lab                lab examinations, Master Data > Lab (/api/lab)
+  internal/labmaster          lab examination groups, Master Data > Lab Master (/api/lab-master)
+  internal/labsubmaster       lab examination subgroups, Master Data > Lab Sub Master (/api/lab-sub-master)
+  internal/doktermcu          MCU doctors, Master Data > Dokter (/api/dokter-mcu)
+  internal/doktermaster       kinds of MCU doctor, Master Data > Dokter Master (/api/dokter-master)
+  internal/nonlab             non-lab services, Master Data > Non Lab (/api/non-lab)
+  internal/mastermcu          MCU examination groups, Master Data > MCU (/api/master-mcu)
+  internal/pasienmcu          MCU patients, Master Data > Pasien (/api/pasien-mcu)
+  internal/perusahaan         client companies, Master Data > Perusahaan (/api/perusahaan)
   internal/perujukotc         OTC referrers, "Penjual OTC" (/api/perujuk-otc)
   internal/pendaftaran        patient registrations, queue numbers, cancel (/api/pendaftaran)
   internal/pengobatan         treatment sales list and the form's lookups (registration, doctor, drug, procedure, examination, ICD-X) and the examination save (/api/pengobatan)
@@ -983,7 +1075,7 @@ frontend/
   src/components/FormKit      modal form, fields and amount inputs for master-data dialogs
   src/components/barcode.ts   Code 128 barcode (SVG) for patient cards
   src/components/dates.ts     today, addDays, DD/MM/YYYY formatting and age
-  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
+  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, MasterMcuPage, PerusahaanPage, PasienMcuPage, LabMasterPage, LabSubMasterPage, LabPage, NonLabPage, DokterMasterPage, DokterMcuPage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
 scripts/import-lab-obat.sh    copies drugs and stock from the legacy lab database
 scripts/import-lab-tindakan.sh copies procedures and prices per branch from lab
 scripts/import-lab-penunjang.sh copies supporting examinations and prices per branch from lab

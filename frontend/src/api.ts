@@ -405,6 +405,146 @@ export interface IcdInput {
   idJenis: number | null;
 }
 
+/** The editable part of an MCU patient (refpasien). gender is "L", "P" or ""; tglLahir is YYYY-MM-DD or "". */
+export interface PasienMcuInput {
+  nama: string;
+  gender: string;
+  tglLahir: string;
+  telp: string;
+  hp: string;
+  alamat: string;
+  kodePerusahaan: string;
+  nik: string;
+  email: string;
+  departemen: string;
+  posisi: string;
+}
+
+/** An MCU patient (refpasien) with its company's name. */
+export interface PasienMcu extends PasienMcuInput {
+  id: number;
+  rm: string;
+  perusahaan: string;
+}
+
+export interface PasienMcuCompany {
+  kode: string;
+  nama: string;
+}
+
+/** A client company (refcompany). isVat is "1" (PPN), "0" (no PPN) or "" (not set). */
+export interface PerusahaanInput {
+  kode: string;
+  nama: string;
+  alamat: string;
+  contactPerson: string;
+  email: string;
+  telepon: string;
+  fax: string;
+  isVat: string;
+}
+
+export interface Perusahaan extends PerusahaanInput {
+  id: number;
+}
+
+/** A group of lab examinations (reflabmaster). */
+export interface LabMaster {
+  id: number;
+  kode: string;
+  nama: string;
+}
+
+export interface LabMasterInput {
+  kode: string;
+  nama: string;
+}
+
+/** The editable part of an MCU doctor (refdoctor). fee is feepercentage. */
+export interface DokterMcuInput {
+  nama: string;
+  idDokterMaster: number;
+  fee: number | null;
+}
+
+/** An MCU doctor (refdoctor); kode (doctorcode) is the key and is not edited. */
+export interface DokterMcu extends DokterMcuInput {
+  kode: string;
+  dokterMaster: string;
+}
+
+export interface DokterMcuMasterOption {
+  id: number;
+  nama: string;
+}
+
+/** A kind of MCU doctor (refdoctormaster). */
+export interface DokterMaster {
+  id: number;
+  nama: string;
+}
+
+/** A service sold with an MCU that is not a lab examination (refnonlab). */
+export interface NonLabInput {
+  nama: string;
+  price: number | null;
+}
+
+export interface NonLab extends NonLabInput {
+  id: number;
+}
+
+/** A lab examination (reflab). id is labid ("Lab Code"); isActive is NOT isdeleted. */
+export interface LabInput {
+  idLabSubMaster: number;
+  kode: string;
+  nama: string;
+  price: number | null;
+  fee: number | null;
+  isActive: boolean;
+}
+
+export interface Lab extends LabInput {
+  id: number;
+  labMaster: string;
+  labSubMaster: string;
+}
+
+export interface LabSubMasterChoice {
+  id: number;
+  nama: string;
+  labMaster: string;
+}
+
+/** A subgroup of lab examinations (reflabsubmaster) with its Lab Master's name. */
+export interface LabSubMasterInput {
+  idLabMaster: number;
+  kode: string;
+  nama: string;
+}
+
+export interface LabSubMaster extends LabSubMasterInput {
+  id: number;
+  labMaster: string;
+}
+
+export interface LabSubMasterOption {
+  id: number;
+  nama: string;
+}
+
+/** An MCU examination group (refmastermcu). */
+export interface MasterMcu {
+  id: number;
+  kode: string;
+  nama: string;
+}
+
+export interface MasterMcuInput {
+  kode: string;
+  nama: string;
+}
+
 /** A person who refers over-the-counter sales (refperujukotc). */
 export interface PerujukOtc {
   id: number;
@@ -1538,6 +1678,58 @@ export const api = {
   createIcd: (token: string, input: IcdInput) => request<Icd>("/api/icd", { method: "POST", body: input, token }),
   updateIcd: (token: string, id: number, input: IcdInput) => request<Icd>(`/api/icd/${id}`, { method: "PUT", body: input, token }),
 
+  // Master Data > Pasien (MCU patients)
+  pasienMcu: (token: string, params: { page: number; size: number; q?: string; sort?: string; dir?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: PasienMcu[]; total: number; unfilteredTotal: number }>(`/api/pasien-mcu?${qs}`, { token });
+  },
+  pasienMcuOptions: (token: string) => request<{ perusahaan: PasienMcuCompany[] }>("/api/pasien-mcu/options", { token }),
+  createPasienMcu: (token: string, input: PasienMcuInput) => request<PasienMcu>("/api/pasien-mcu", { method: "POST", body: input, token }),
+  updatePasienMcu: (token: string, id: number, input: PasienMcuInput) =>
+    request<PasienMcu>(`/api/pasien-mcu/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > Perusahaan
+  perusahaan: (token: string) => request<{ perusahaan: Perusahaan[] }>("/api/perusahaan", { token }),
+  createPerusahaan: (token: string, input: PerusahaanInput) => request<Perusahaan>("/api/perusahaan", { method: "POST", body: input, token }),
+  updatePerusahaan: (token: string, id: number, input: PerusahaanInput) =>
+    request<Perusahaan>(`/api/perusahaan/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > Lab Master
+  labMaster: (token: string) => request<{ labMaster: LabMaster[] }>("/api/lab-master", { token }),
+  createLabMaster: (token: string, input: LabMasterInput) => request<LabMaster>("/api/lab-master", { method: "POST", body: input, token }),
+  updateLabMaster: (token: string, id: number, input: LabMasterInput) =>
+    request<LabMaster>(`/api/lab-master/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > Dokter (MCU doctors)
+  dokterMcu: (token: string) => request<{ dokter: DokterMcu[] }>("/api/dokter-mcu", { token }),
+  dokterMcuOptions: (token: string) => request<{ dokterMaster: DokterMcuMasterOption[] }>("/api/dokter-mcu/options", { token }),
+  createDokterMcu: (token: string, input: DokterMcuInput & { kode: string }) =>
+    request<DokterMcu>("/api/dokter-mcu", { method: "POST", body: input, token }),
+  updateDokterMcu: (token: string, kode: string, input: DokterMcuInput) =>
+    request<DokterMcu>(`/api/dokter-mcu/${encodeURIComponent(kode)}`, { method: "PUT", body: input, token }),
+  // Master Data > Dokter Master
+  dokterMaster: (token: string) => request<{ dokterMaster: DokterMaster[] }>("/api/dokter-master", { token }),
+  createDokterMaster: (token: string, nama: string) => request<DokterMaster>("/api/dokter-master", { method: "POST", body: { nama }, token }),
+  updateDokterMaster: (token: string, id: number, nama: string) =>
+    request<DokterMaster>(`/api/dokter-master/${id}`, { method: "PUT", body: { nama }, token }),
+  // Master Data > Non Lab
+  nonLab: (token: string) => request<{ nonLab: NonLab[] }>("/api/non-lab", { token }),
+  createNonLab: (token: string, input: NonLabInput) => request<NonLab>("/api/non-lab", { method: "POST", body: input, token }),
+  updateNonLab: (token: string, id: number, input: NonLabInput) => request<NonLab>(`/api/non-lab/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > Lab
+  lab: (token: string) => request<{ lab: Lab[] }>("/api/lab", { token }),
+  labOptions: (token: string) => request<{ labSubMaster: LabSubMasterChoice[] }>("/api/lab/options", { token }),
+  createLab: (token: string, input: LabInput) => request<Lab>("/api/lab", { method: "POST", body: input, token }),
+  updateLab: (token: string, id: number, input: LabInput) => request<Lab>(`/api/lab/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > Lab Sub Master
+  labSubMaster: (token: string) => request<{ labSubMaster: LabSubMaster[] }>("/api/lab-sub-master", { token }),
+  labSubMasterOptions: (token: string) => request<{ labMaster: LabSubMasterOption[] }>("/api/lab-sub-master/options", { token }),
+  createLabSubMaster: (token: string, input: LabSubMasterInput) => request<LabSubMaster>("/api/lab-sub-master", { method: "POST", body: input, token }),
+  updateLabSubMaster: (token: string, id: number, input: LabSubMasterInput) =>
+    request<LabSubMaster>(`/api/lab-sub-master/${id}`, { method: "PUT", body: input, token }),
+  // Master Data > MCU
+  masterMcu: (token: string) => request<{ mcu: MasterMcu[] }>("/api/master-mcu", { token }),
+  createMasterMcu: (token: string, input: MasterMcuInput) => request<MasterMcu>("/api/master-mcu", { method: "POST", body: input, token }),
+  updateMasterMcu: (token: string, id: number, input: MasterMcuInput) =>
+    request<MasterMcu>(`/api/master-mcu/${id}`, { method: "PUT", body: input, token }),
   // Master Data Klinik > Penjual OTC (Perujuk OTC)
   perujukOtc: (token: string) => request<{ perujuk: PerujukOtc[] }>("/api/perujuk-otc", { token }),
   createPerujukOtc: (token: string, nama: string) => request<PerujukOtc>("/api/perujuk-otc", { method: "POST", body: { nama }, token }),

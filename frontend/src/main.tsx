@@ -34,6 +34,15 @@ import PenerimaanBarangPage from "./pages/PenerimaanBarangPage";
 import PenerimaanBarangFormPage from "./pages/PenerimaanBarangFormPage";
 import OrganisasiLokasiPage from "./pages/OrganisasiLokasiPage";
 import PerujukOtcPage from "./pages/PerujukOtcPage";
+import MasterMcuPage from "./pages/MasterMcuPage";
+import PerusahaanPage from "./pages/PerusahaanPage";
+import PasienMcuPage from "./pages/PasienMcuPage";
+import LabMasterPage from "./pages/LabMasterPage";
+import LabSubMasterPage from "./pages/LabSubMasterPage";
+import LabPage from "./pages/LabPage";
+import NonLabPage from "./pages/NonLabPage";
+import DokterMasterPage from "./pages/DokterMasterPage";
+import DokterMcuPage from "./pages/DokterMcuPage";
 import PrincipalPage from "./pages/PrincipalPage";
 import PenunjangPage from "./pages/PenunjangPage";
 import MenuPage from "./pages/MenuPage";
@@ -87,6 +96,15 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/master-data-klinik/distributor" element={<MenuGuard><DistributorPage /></MenuGuard>} />
             <Route path="/master-data-klinik/principal" element={<MenuGuard><PrincipalPage /></MenuGuard>} />
             <Route path="/master-data-klinik/icd" element={<MenuGuard><IcdPage /></MenuGuard>} />
+            <Route path="/master-data/mcu" element={<MenuGuard><MasterMcuPage /></MenuGuard>} />
+            <Route path="/master-data/perusahaan" element={<MenuGuard><PerusahaanPage /></MenuGuard>} />
+            <Route path="/master-data/pasien" element={<MenuGuard><PasienMcuPage /></MenuGuard>} />
+            <Route path="/master-data/lab-master" element={<MenuGuard><LabMasterPage /></MenuGuard>} />
+            <Route path="/master-data/lab-sub-master" element={<MenuGuard><LabSubMasterPage /></MenuGuard>} />
+            <Route path="/master-data/lab" element={<MenuGuard><LabPage /></MenuGuard>} />
+            <Route path="/master-data/non-lab" element={<MenuGuard><NonLabPage /></MenuGuard>} />
+            <Route path="/master-data/dokter-master" element={<MenuGuard><DokterMasterPage /></MenuGuard>} />
+            <Route path="/master-data/dokter" element={<MenuGuard><DokterMcuPage /></MenuGuard>} />
             <Route path="/master-data-klinik/penjual-otc" element={<MenuGuard><PerujukOtcPage /></MenuGuard>} />
             <Route path="/front-office-klinik/pendaftaran-pasien" element={<MenuGuard><PendaftaranPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan" element={<MenuGuard><PengobatanPage /></MenuGuard>} />

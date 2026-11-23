@@ -2017,6 +2017,928 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationError'
 
+  /api/pasien-mcu:
+    get:
+      tags: [master-data]
+      summary: List MCU patients (refpasien), one page
+      description: |
+        The Master Data > Pasien list with each patient's company name (refcompany).
+        Soft-deleted rows are hidden. Requires the Master Data > Pasien menu.
+      operationId: listPasienMcu
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 10 } }
+        - { name: q, in: query, description: Search No RM, name, NIK, address or company name, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [rm, nama, gender, tglLahir, telp, hp, alamat, perusahaan, nik, email, departemen, posisi], default: rm } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+      responses:
+        '200':
+          description: One page of patients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PasienMcu'
+                  total: { type: integer, description: Matching rows }
+                  unfilteredTotal: { type: integer, description: Rows ignoring the search }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create an MCU patient
+      description: No RM is assigned by the server, YYMMDD of today (Asia/Jakarta) plus a 4-digit sequence.
+      operationId: createPasienMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasienMcuInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasienMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: All 9999 No RM of today are used
+
+  /api/pasien-mcu/options:
+    get:
+      tags: [master-data]
+      summary: Choices for the MCU patient form
+      operationId: pasienMcuOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Companies (refcompany)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perusahaan:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kode: { type: string, example: UMUM }
+                        nama: { type: string, example: UMUM }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/pasien-mcu/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: refpasien.pasienid
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update an MCU patient (No RM stays)
+      operationId: updatePasienMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasienMcuInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasienMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/perusahaan:
+    get:
+      tags: [master-data]
+      summary: List client companies (refcompany)
+      description: The Master Data > Perusahaan list, ordered by code. Requires the Master Data > Perusahaan menu.
+      operationId: listPerusahaan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Companies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perusahaan:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Perusahaan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a client company
+      operationId: createPerusahaan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PerusahaanInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Perusahaan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The code is already used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/perusahaan/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: refcompany.companyid
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update a client company
+      operationId: updatePerusahaan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PerusahaanInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Perusahaan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The code is already used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/dokter-mcu:
+    get:
+      tags: [master-data]
+      summary: List MCU doctors (refdoctor)
+      description: |
+        The Master Data > Dokter list with each doctor's Dokter Master name, ordered by code.
+        Separate from the clinic doctors (/api/dokter). Requires the Master Data > Dokter menu.
+      operationId: listDokterMcu
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: MCU doctors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dokter:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DokterMcu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create an MCU doctor
+      operationId: createDokterMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/DokterMcuInput'
+                - type: object
+                  required: [kode]
+                  properties:
+                    kode: { type: string, maxLength: 20, description: refdoctor.doctorcode, example: D24 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DokterMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The code is already used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/dokter-mcu/options:
+    get:
+      tags: [master-data]
+      summary: Dokter Masters for the MCU doctor form
+      operationId: dokterMcuOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dokter Masters (refdoctormaster)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dokterMaster:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DokterMaster'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/dokter-mcu/{kode}:
+    parameters:
+      - name: kode
+        in: path
+        required: true
+        description: refdoctor.doctorcode
+        schema:
+          type: string
+    put:
+      tags: [master-data]
+      summary: Update an MCU doctor (the code stays)
+      operationId: updateDokterMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DokterMcuInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DokterMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/dokter-master:
+    get:
+      tags: [master-data]
+      summary: List kinds of MCU doctor (refdoctormaster)
+      description: The Master Data > Dokter Master list, ordered by name. Requires the Master Data > Dokter Master menu.
+      operationId: listDokterMaster
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Kinds of doctor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dokterMaster:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DokterMaster'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a kind of MCU doctor
+      operationId: createDokterMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DokterMasterInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DokterMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/dokter-master/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: refdoctormaster.doctormaster
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Rename a kind of MCU doctor
+      operationId: updateDokterMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DokterMasterInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DokterMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/non-lab:
+    get:
+      tags: [master-data]
+      summary: List non-lab services (refnonlab)
+      description: The Master Data > Non Lab list, ordered by id, without soft-deleted rows. Requires the Master Data > Non Lab menu.
+      operationId: listNonLab
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Non-lab services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nonLab:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NonLab'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a non-lab service
+      operationId: createNonLab
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonLabInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonLab'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/non-lab/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update a non-lab service
+      operationId: updateNonLab
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonLabInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonLab'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/lab:
+    get:
+      tags: [master-data]
+      summary: List lab examinations (reflab)
+      description: |
+        The Master Data > Lab list with each row's Sub Master and Lab Master names, ordered by id.
+        Non Active rows (isdeleted) are included. Requires the Master Data > Lab menu.
+      operationId: listLab
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lab examinations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lab:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Lab'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a lab examination
+      description: An empty kode is stored as the name.
+      operationId: createLab
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lab'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab/options:
+    get:
+      tags: [master-data]
+      summary: Sub Masters for the Lab form
+      operationId: labOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sub Masters with their Lab Master (without soft-deleted rows)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labSubMaster:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        nama: { type: string, example: FAAL HATI }
+                        labMaster: { type: string, example: KIMIA KLINIK }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: reflab.labid
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update a lab examination, including its status
+      description: Deactivating records deletedby/deleteddate; activating clears them.
+      operationId: updateLab
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lab'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/lab-master:
+    get:
+      tags: [master-data]
+      summary: List lab examination groups (reflabmaster)
+      description: The Master Data > Lab Master list, ordered by code, without soft-deleted rows. Requires the Master Data > Lab Master menu.
+      operationId: listLabMaster
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lab groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labMaster:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabMaster'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a lab examination group
+      operationId: createLabMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabMasterInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab-master/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: reflabmaster.labmasterid
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update a lab examination group
+      operationId: updateLabMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabMasterInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/lab-sub-master:
+    get:
+      tags: [master-data]
+      summary: List lab examination subgroups (reflabsubmaster)
+      description: |
+        The Master Data > Lab Sub Master list with each row's Lab Master name, ordered by Lab Master
+        then entry order, without soft-deleted rows. Requires the Master Data > Lab Sub Master menu.
+      operationId: listLabSubMaster
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lab subgroups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labSubMaster:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabSubMaster'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create a lab examination subgroup
+      operationId: createLabSubMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabSubMasterInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabSubMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab-sub-master/options:
+    get:
+      tags: [master-data]
+      summary: Lab Masters for the Lab Sub Master form
+      operationId: labSubMasterOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lab Masters (reflabmaster, without soft-deleted rows)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  labMaster:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        nama: { type: string, example: KIMIA KLINIK }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab-sub-master/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: reflabsubmaster.labsubmasterid
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update a lab examination subgroup
+      operationId: updateLabSubMaster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabSubMasterInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabSubMaster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/master-mcu:
+    get:
+      tags: [master-data]
+      summary: List MCU examination groups (refmastermcu)
+      description: The Master Data > MCU list. Requires the Master Data > MCU menu.
+      operationId: listMasterMcu
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: MCU groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mcu:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MasterMcu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [master-data]
+      summary: Create an MCU examination group
+      operationId: createMasterMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MasterMcuInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MasterMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/master-mcu/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [master-data]
+      summary: Update an MCU examination group
+      operationId: updateMasterMcu
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MasterMcuInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MasterMcu'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/perujuk-otc:
     get:
       tags: [master-data]
@@ -5202,6 +6124,158 @@ components:
             jenis: { type: string, example: GIGI }
             updatedBy: { type: string }
             updatedAt: { type: string, format: date-time, nullable: true }
+
+    PasienMcuInput:
+      type: object
+      required: [nama, gender, kodePerusahaan]
+      properties:
+        nama: { type: string, maxLength: 100, example: Ekowati }
+        gender: { type: string, enum: [L, P], description: L Laki-Laki, P Perempuan }
+        tglLahir: { type: string, description: "YYYY-MM-DD, or empty", example: '1977-05-13' }
+        telp: { type: string, maxLength: 15 }
+        hp: { type: string, maxLength: 15, example: '081585847700' }
+        alamat: { type: string, maxLength: 200, example: Jakarta }
+        kodePerusahaan: { type: string, maxLength: 20, description: refcompany.companycode, example: UMUM }
+        nik: { type: string, maxLength: 20 }
+        email: { type: string, maxLength: 50 }
+        departemen: { type: string, maxLength: 50 }
+        posisi: { type: string, maxLength: 50, example: Floorman }
+
+    PasienMcu:
+      allOf:
+        - $ref: '#/components/schemas/PasienMcuInput'
+        - type: object
+          properties:
+            id: { type: integer, description: refpasien.pasienid }
+            rm: { type: string, example: '1902260001' }
+            perusahaan: { type: string, description: refcompany.companyname, example: UMUM }
+
+    PerusahaanInput:
+      type: object
+      required: [kode, nama]
+      properties:
+        kode: { type: string, maxLength: 10, example: OMS }
+        nama: { type: string, maxLength: 255, example: PT OMS JAKARTA }
+        alamat: { type: string, maxLength: 255, example: JAKARTA }
+        contactPerson: { type: string, maxLength: 100, example: Bu Gita }
+        email: { type: string, maxLength: 100 }
+        telepon: { type: string, maxLength: 30, example: 021-45870116 }
+        fax: { type: string, maxLength: 30 }
+        isVat: { type: string, enum: ['', '0', '1'], description: "'1' PPN, '0' no PPN, '' not set" }
+
+    Perusahaan:
+      allOf:
+        - $ref: '#/components/schemas/PerusahaanInput'
+        - type: object
+          properties:
+            id: { type: integer, description: refcompany.companyid }
+
+    DokterMcuInput:
+      type: object
+      required: [nama, idDokterMaster]
+      properties:
+        nama: { type: string, maxLength: 50, description: refdoctor.doctorname, example: Dr Diar Garnida }
+        idDokterMaster: { type: integer, description: refdoctormaster.doctormaster, example: 1 }
+        fee: { type: number, nullable: true, minimum: 0, maximum: 100, description: refdoctor.feepercentage, example: 10 }
+
+    DokterMcu:
+      allOf:
+        - $ref: '#/components/schemas/DokterMcuInput'
+        - type: object
+          properties:
+            kode: { type: string, description: refdoctor.doctorcode, example: D08 }
+            dokterMaster: { type: string, description: refdoctormaster.doctormastername, example: DOKTER UMUM }
+
+    DokterMasterInput:
+      type: object
+      required: [nama]
+      properties:
+        nama: { type: string, maxLength: 50, description: refdoctormaster.doctormastername, example: CARDIOLOGIST }
+
+    DokterMaster:
+      allOf:
+        - $ref: '#/components/schemas/DokterMasterInput'
+        - type: object
+          properties:
+            id: { type: integer, description: refdoctormaster.doctormaster }
+
+    NonLabInput:
+      type: object
+      required: [nama]
+      properties:
+        nama: { type: string, maxLength: 100, description: refnonlab.name, example: Sameday }
+        price: { type: number, nullable: true, minimum: 0, example: 200000 }
+
+    NonLab:
+      allOf:
+        - $ref: '#/components/schemas/NonLabInput'
+        - type: object
+          properties:
+            id: { type: integer }
+
+    LabInput:
+      type: object
+      required: [idLabSubMaster, nama]
+      properties:
+        idLabSubMaster: { type: integer, description: reflabsubmaster.labsubmasterid, example: 4 }
+        kode: { type: string, maxLength: 50, description: reflab.labcode; empty means the name, example: SGOT }
+        nama: { type: string, maxLength: 50, description: reflab.labname, example: SGOT }
+        price: { type: number, nullable: true, minimum: 0, example: 95000 }
+        fee: { type: number, nullable: true, minimum: 0, maximum: 100, example: 15 }
+        isActive: { type: boolean, description: NOT reflab.isdeleted }
+
+    Lab:
+      allOf:
+        - $ref: '#/components/schemas/LabInput'
+        - type: object
+          properties:
+            id: { type: integer, description: reflab.labid, shown as Lab Code }
+            labMaster: { type: string, example: KIMIA KLINIK }
+            labSubMaster: { type: string, example: FAAL HATI }
+
+    LabMasterInput:
+      type: object
+      required: [kode, nama]
+      properties:
+        kode: { type: string, maxLength: 20, example: KIMIA KLINIK }
+        nama: { type: string, maxLength: 50, example: KIMIA KLINIK }
+
+    LabMaster:
+      allOf:
+        - $ref: '#/components/schemas/LabMasterInput'
+        - type: object
+          properties:
+            id: { type: integer, description: reflabmaster.labmasterid }
+
+    LabSubMasterInput:
+      type: object
+      required: [idLabMaster, kode, nama]
+      properties:
+        idLabMaster: { type: integer, description: reflabmaster.labmasterid, example: 4 }
+        kode: { type: string, maxLength: 20, example: FAAL HATI }
+        nama: { type: string, maxLength: 50, example: FAAL HATI }
+
+    LabSubMaster:
+      allOf:
+        - $ref: '#/components/schemas/LabSubMasterInput'
+        - type: object
+          properties:
+            id: { type: integer, description: reflabsubmaster.labsubmasterid }
+            labMaster: { type: string, description: reflabmaster.labmastername, example: KIMIA KLINIK }
+
+    MasterMcuInput:
+      type: object
+      required: [kode, nama]
+      properties:
+        kode: { type: string, maxLength: 10, example: GNR }
+        nama: { type: string, maxLength: 30, example: General }
+
+    MasterMcu:
+      allOf:
+        - $ref: '#/components/schemas/MasterMcuInput'
+        - type: object
+          properties:
+            id: { type: integer }
 
     PerujukOtcInput:
       type: object

@@ -20,17 +20,26 @@ import (
 	"github.com/example/be_jwt_golang/backend/internal/distributor"
 	"github.com/example/be_jwt_golang/backend/internal/docs"
 	"github.com/example/be_jwt_golang/backend/internal/dokter"
+	"github.com/example/be_jwt_golang/backend/internal/doktermaster"
+	"github.com/example/be_jwt_golang/backend/internal/doktermcu"
 	"github.com/example/be_jwt_golang/backend/internal/icd"
 	"github.com/example/be_jwt_golang/backend/internal/jamkes"
+	"github.com/example/be_jwt_golang/backend/internal/lab"
+	"github.com/example/be_jwt_golang/backend/internal/labmaster"
+	"github.com/example/be_jwt_golang/backend/internal/labsubmaster"
+	"github.com/example/be_jwt_golang/backend/internal/mastermcu"
 	"github.com/example/be_jwt_golang/backend/internal/menu"
+	"github.com/example/be_jwt_golang/backend/internal/nonlab"
 	"github.com/example/be_jwt_golang/backend/internal/obat"
 	"github.com/example/be_jwt_golang/backend/internal/orglokasi"
 	"github.com/example/be_jwt_golang/backend/internal/pasien"
+	"github.com/example/be_jwt_golang/backend/internal/pasienmcu"
 	"github.com/example/be_jwt_golang/backend/internal/pendaftaran"
 	"github.com/example/be_jwt_golang/backend/internal/penerimaan"
 	"github.com/example/be_jwt_golang/backend/internal/pengobatan"
 	"github.com/example/be_jwt_golang/backend/internal/penunjang"
 	"github.com/example/be_jwt_golang/backend/internal/perujukotc"
+	"github.com/example/be_jwt_golang/backend/internal/perusahaan"
 	"github.com/example/be_jwt_golang/backend/internal/principal"
 	"github.com/example/be_jwt_golang/backend/internal/reportklinik"
 	"github.com/example/be_jwt_golang/backend/internal/role"
@@ -86,6 +95,15 @@ func main() {
 	distributor.NewHandler(distributor.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	principal.NewHandler(principal.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	icd.NewHandler(icd.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	lab.NewHandler(lab.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	labmaster.NewHandler(labmaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	labsubmaster.NewHandler(labsubmaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	nonlab.NewHandler(nonlab.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	doktermcu.NewHandler(doktermcu.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	doktermaster.NewHandler(doktermaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	mastermcu.NewHandler(mastermcu.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	pasienmcu.NewHandler(pasienmcu.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	perusahaan.NewHandler(perusahaan.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	perujukotc.NewHandler(perujukotc.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	pendaftaran.NewHandler(pendaftaran.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	orglokasi.NewHandler(orglokasi.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
