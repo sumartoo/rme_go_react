@@ -61,8 +61,8 @@ export default function PengobatanPage({ raw = false }: { raw?: boolean }) {
     (raw ? api.rawDataPengobatanOptions(token) : api.pengobatanOptions(token))
       .then((o) => {
         setOptions(o);
-        // Raw Data Pengobatan defaults to yesterday and today (H-1 to H), like the other reports.
-        setFrom(raw ? dayBefore(o.today) : o.today);
+        // Both pages default to yesterday and today (H-1 to H).
+        setFrom(dayBefore(o.today));
         setTo(o.today);
         setBranch(initialBranch(o.branches));
       })
