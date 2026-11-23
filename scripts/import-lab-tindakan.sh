@@ -18,7 +18,8 @@ REPLACE=0
 require_empty reftindakan "$REPLACE"
 
 echo "Clearing app procedure tables..."
-app -c "TRUNCATE reftindakandetail, reftindakan, refjenistindakan RESTART IDENTITY"
+# CASCADE also empties the doctors' procedures (trxtindakan): re-run import-lab-dokter.sh afterwards.
+app -c "TRUNCATE reftindakandetail, reftindakan, refjenistindakan RESTART IDENTITY CASCADE"
 
 echo "Copying from $LAB_USER@$LAB_HOST:$LAB_PORT/$LAB_DB ..."
 copy refjenistindakan "id, info"

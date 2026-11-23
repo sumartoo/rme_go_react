@@ -2,6 +2,7 @@
 #
 # Needs LAB_PASSWORD. Optional: LAB_HOST (default host.docker.internal, i.e. the
 # Docker host), LAB_PORT (5432), LAB_DB (lab), LAB_USER (postgres).
+# Rows go to DATABASE_URL (env or .env) when set, else the "db" container.
 # Both databases are reached through psql in the "db" container, and rows move
 # with \copy, so it works across PostgreSQL versions.
 
@@ -14,8 +15,17 @@ export MSYS_NO_PATHCONV=1 # Git Bash on Windows: do not rewrite arguments
 
 # psql against the lab database
 lab() { docker compose exec -T -e PGPASSWORD="$LAB_PASSWORD" db psql -X -q -v ON_ERROR_STOP=1 -h "$LAB_HOST" -p "$LAB_PORT" -U "$LAB_USER" -d "$LAB_DB" "$@"; }
-# psql against the app database (credentials from the container's environment)
-app() { docker compose exec -T db sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' psql "$@"; }
+# The app database: the backend's DATABASE_URL (env or .env) when set, so imports
+# land where the backend reads; otherwise the "db" container's own database.
+if [[ -z "${DATABASE_URL:-}" && -f .env ]]; then
+  DATABASE_URL=$(sed -n 's/^DATABASE_URL=//p' .env | tail -n 1)
+fi
+# psql against the app database
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  app() { docker compose exec -T db psql -X -q -v ON_ERROR_STOP=1 "$DATABASE_URL" "$@"; }
+else
+  app() { docker compose exec -T db sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' psql "$@"; }
+fi
 
 # require_empty TABLE REPLACE: stop unless TABLE is empty or REPLACE is 1.
 require_empty() {

@@ -4275,21 +4275,21 @@ paths:
           application/json:
             schema:
               type: object
-                properties:
-                  keluhanUtama: { type: string, maxLength: 300 }
-                  anamnesis: { type: string, maxLength: 300 }
-                  sistole: { type: integer, nullable: true, minimum: 0, maximum: 300 }
-                  diastole: { type: integer, nullable: true, minimum: 0, maximum: 250 }
-                  beratBadan: { type: integer, nullable: true, minimum: 0, maximum: 500, description: kg }
-                  tinggiBadan: { type: integer, nullable: true, minimum: 0, maximum: 300, description: cm }
-                  suhu: { type: number, nullable: true, minimum: 25, maximum: 45, description: '°C' }
-                  pemeriksaanFisik: { type: string, maxLength: 300 }
-                  rekapHasilPenunjang: { type: string, maxLength: 300 }
-                  hasilPenunjang: { type: string, maxLength: 300 }
-                  rencanaPenatalaksanaan: { type: string, maxLength: 300 }
-                  hasilPemeriksaanDokter: { type: string, maxLength: 400 }
-                  tindakanDokter: { type: string, maxLength: 400 }
-                  idDokter: { type: integer, nullable: true, description: Dokter PJ (refmdokter) }
+              properties:
+                keluhanUtama: { type: string, maxLength: 300 }
+                anamnesis: { type: string, maxLength: 300 }
+                sistole: { type: integer, nullable: true, minimum: 0, maximum: 300 }
+                diastole: { type: integer, nullable: true, minimum: 0, maximum: 250 }
+                beratBadan: { type: integer, nullable: true, minimum: 0, maximum: 500, description: kg }
+                tinggiBadan: { type: integer, nullable: true, minimum: 0, maximum: 300, description: cm }
+                suhu: { type: number, nullable: true, minimum: 25, maximum: 45, description: '°C' }
+                pemeriksaanFisik: { type: string, maxLength: 300 }
+                rekapHasilPenunjang: { type: string, maxLength: 300 }
+                hasilPenunjang: { type: string, maxLength: 300 }
+                rencanaPenatalaksanaan: { type: string, maxLength: 300 }
+                hasilPemeriksaanDokter: { type: string, maxLength: 400 }
+                tindakanDokter: { type: string, maxLength: 400 }
+                idDokter: { type: integer, nullable: true, description: Dokter PJ (refmdokter) }
       responses:
         '200':
           description: Saved; the stored examination

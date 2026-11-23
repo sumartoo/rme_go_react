@@ -19,7 +19,9 @@ services:
     build: ./backend
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-authdb}?sslmode=disable
+      # Set DATABASE_URL in .env to use another database (e.g. a local one on the
+      # host via host.docker.internal); defaults to the "db" container.
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-authdb}?sslmode=disable}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set - copy .env.example to .env}
       JWT_TTL: ${JWT_TTL:-15m}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}

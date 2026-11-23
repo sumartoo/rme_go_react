@@ -206,6 +206,17 @@ Who can open the page at all is decided by the role (the Obat menu item).
 - The **$** button edits stock and prices for one of the user's branches. Saving creates the `trxstock` row if the drug has none at that branch yet.
 - Upload (import from a file) is not built yet.
 
+### Importing everything from lab
+
+`scripts/import-lab-all.sh` runs all the `import-lab-*.sh` scripts below in dependency order and stops at the first failure (a few minutes in total):
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-all.sh            # into an empty app database
+LAB_PASSWORD=... scripts/import-lab-all.sh --replace  # wipe and copy everything again, e.g. to pull new lab data
+```
+
+`--replace` also deletes rows entered in the app since the last import. The scripts write to `DATABASE_URL` from `.env` when it is set (the same database the backend uses), otherwise to the `db` container.
+
 ### Importing drugs from lab
 
 The drug data is not in the migrations. Copy it from the lab database (with the stack running):
@@ -889,6 +900,52 @@ docker run --rm -v "$PWD/backend:/src" -w /src golang:1.26-alpine go test ./...
 ```
 
 The tests cover JWT generation and parsing (expired tokens, wrong secret, `alg=none`), register and login validation, and the full HTTP flow (register, duplicate email, wrong password, login, `/api/me`, refresh, missing or expired token) against an in-memory repository. They also cover menu filtering by role and the role and user APIs (403 without the menu, validation, duplicate names, deleting a role in use, and the self-lockout guards).
+
+## Deployment (GitHub Actions → server)
+
+[.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml) runs on every push and pull request:
+
+1. **Backend**: `go vet` and `go test -race`.
+2. **Frontend**: `npm ci` and `npm run build` (type check included).
+3. **Images** (push to `main` only): builds both Dockerfiles and pushes them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-backend` and `-frontend`, tagged with the commit SHA and `latest`.
+4. **Deploy** (after the images): copies [deploy/docker-compose.prod.yml](deploy/docker-compose.prod.yml) and [deploy/remote-deploy.sh](deploy/remote-deploy.sh) to the server over SSH, pulls the new images and restarts. The job fails if the backend healthcheck does not pass within 3 minutes.
+
+The server runs only the backend and frontend containers. The database is the PostgreSQL installed on the server, and the migrations run when the backend starts.
+
+### One-time server setup
+
+On a Linux server with Docker Engine and the Compose plugin:
+
+1. **Deploy user**: create a user that may run Docker (`sudo usermod -aG docker deploy`) and add the public half of a new SSH key pair to its `~/.ssh/authorized_keys`.
+2. **PostgreSQL**: create the database and a user for the app. The containers connect from the Docker networks, so in `postgresql.conf` set `listen_addresses = '*'` (or the Docker gateway addresses), and in `pg_hba.conf` add `host new_rme rme 172.16.0.0/12 scram-sha-256`. Then restart PostgreSQL. Keep port 5432 closed to the internet in the firewall.
+3. **Settings**: as the deploy user `mkdir -p /home/deploy/apps/new_rme`, copy [deploy/.env.example](deploy/.env.example) to `/home/deploy/apps/new_rme/.env`, fill in `DATABASE_URL` and a new `JWT_SECRET` (`openssl rand -hex 32`), and run `chmod 600 /home/deploy/apps/new_rme/.env`. The secrets stay on the server, not in GitHub.
+4. **Data**: to copy the lab data, run `scripts/import-lab-all.sh` with `DATABASE_URL` pointing at the server's database, or restore a `pg_dump`.
+
+### GitHub settings
+
+In the repository's **Settings › Environments**, create an environment named `production` (optionally with required reviewers, so each deploy waits for approval). Add these secrets to it:
+
+| Secret | Value |
+|---|---|
+| `SSH_HOST` | Server IP or host name |
+| `SSH_USER` | The deploy user, e.g. `deploy` |
+| `SSH_PRIVATE_KEY` | The private half of the deploy key |
+| `SSH_KNOWN_HOSTS` | Output of `ssh-keyscan -p 22 <host>`, checked against the server's real fingerprint |
+
+These variables are optional: `SSH_PORT` (default `22`) and `DEPLOY_PATH` (default `/home/deploy/apps/new_rme`).
+
+The workflow pulls images with its own short-lived `GITHUB_TOKEN`, so the server needs no registry password.
+
+### Rollback and operations
+
+```bash
+cd /home/deploy/apps/new_rme
+docker compose ps                     # status
+docker compose logs -f backend        # logs
+IMAGE_TAG=<older-commit-sha> docker compose up -d   # roll back to an earlier build
+```
+
+Re-running an older workflow run from the Actions tab also deploys that commit again. Migrations only move forward, so roll back only to builds whose migrations are already applied.
 
 ## Project layout
 
