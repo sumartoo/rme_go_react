@@ -215,7 +215,7 @@ export default function RujukanPage() {
           rows={page?.rows ?? []}
           rowKey={(r) => `${r.idJual}-${r.idLine ?? 0}`}
           initialSort={{ key: "tgl", dir: "desc" }}
-          defaultPageSize={20}
+          defaultPageSize={10}
           toolbarStart={<BranchFilter branches={branches} value={branch} onChange={setBranch} />}
           remote={{ total: page?.total ?? 0, unfilteredTotal: page?.unfilteredTotal ?? 0, loading: loading || !page, onQuery: fetchPage, fetchAll }}
         />

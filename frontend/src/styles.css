@@ -947,3 +947,25 @@ td.dt-key { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font
 .gr-head { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gr-head .tx-row { grid-template-columns: 110px minmax(0, 1fr); }
 @media (max-width: 900px) { .gr-head { grid-template-columns: 1fr; } }
+
+/* Read-only facts shown above a form's fields (e.g. Setting > Price). */
+.form-summary { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 12px; font-size: 0.9rem; }
+.form-summary dt { color: var(--muted); }
+.form-summary dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+
+/* Setting > Paket Price: the lab examination checklist and the detail table. */
+.lab-picker { margin: 4px 0 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.lab-picker[aria-invalid="true"] { border-color: var(--error); }
+.lab-picker legend { padding: 0 4px; font-weight: 600; font-size: 0.9rem; }
+.lab-picker-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.lab-picker-bar input[type="search"] { flex: 1 1 200px; min-width: 0; }
+.lab-picker-only { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; white-space: nowrap; }
+.lab-picker-sum { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lab-picker-list { max-height: 320px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 6px; }
+.lab-picker-group + .lab-picker-group { margin-top: 8px; }
+.lab-picker-head { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; padding: 2px 0; }
+.lab-picker-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 2px 0 2px 22px; font-size: 0.875rem; }
+.lab-picker-price { color: var(--muted); font-variant-numeric: tabular-nums; }
+.paket-labs-table { max-height: 50vh; overflow: auto; }
+.paket-labs-table tfoot th { text-align: left; }
+.paket-labs-table tfoot th.dt-num { text-align: right; }

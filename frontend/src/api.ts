@@ -494,6 +494,64 @@ export interface NonLab extends NonLabInput {
   id: number;
 }
 
+/** Setting > Paket Price: an MCU package (refpriceheader) as listed. Dates are YYYY-MM-DD. */
+export interface PaketPrice {
+  id: number;
+  idPerusahaan: number;
+  perusahaan: string;
+  nama: string;
+  isPaket: boolean;
+  idKategori: number | null;
+  kategori: string;
+  fromDate: string;
+  toDate: string;
+  price: number | null;
+  isActive: boolean;
+  jumlahLab: number;
+}
+
+/** A lab examination in (or offered for) a package. */
+export interface PaketPriceLab {
+  id: number;
+  labMaster: string;
+  labSubMaster: string;
+  nama: string;
+  price: number | null;
+  isActive: boolean;
+}
+
+export interface PaketPriceDetail extends PaketPrice {
+  labs: PaketPriceLab[];
+}
+
+export interface PaketPriceInput {
+  idPerusahaan: number;
+  nama: string;
+  isPaket: boolean;
+  idKategori: number | null;
+  fromDate: string;
+  toDate: string;
+  price: number | null;
+  isActive: boolean;
+  labIds: number[];
+}
+
+export interface PaketPriceOptions {
+  perusahaan: { id: number; nama: string }[];
+  kategori: { id: number; nama: string }[];
+  labs: PaketPriceLab[];
+}
+
+/** Setting > Price: a lab examination's price (reflab.price) with its Sub Master and Lab Master. */
+export interface LabPrice {
+  id: number;
+  labMaster: string;
+  labSubMaster: string;
+  nama: string;
+  price: number | null;
+  isActive: boolean;
+}
+
 /** A lab examination (reflab). id is labid ("Lab Code"); isActive is NOT isdeleted. */
 export interface LabInput {
   idLabSubMaster: number;
@@ -1714,6 +1772,19 @@ export const api = {
   nonLab: (token: string) => request<{ nonLab: NonLab[] }>("/api/non-lab", { token }),
   createNonLab: (token: string, input: NonLabInput) => request<NonLab>("/api/non-lab", { method: "POST", body: input, token }),
   updateNonLab: (token: string, id: number, input: NonLabInput) => request<NonLab>(`/api/non-lab/${id}`, { method: "PUT", body: input, token }),
+  // Setting > Paket Price
+  paketPrice: (token: string) => request<{ paket: PaketPrice[] }>("/api/paket-price", { token }),
+  paketPriceOptions: (token: string) => request<PaketPriceOptions>("/api/paket-price/options", { token }),
+  paketPriceDetail: (token: string, id: number) => request<PaketPriceDetail>(`/api/paket-price/${id}`, { token }),
+  createPaketPrice: (token: string, input: PaketPriceInput) =>
+    request<PaketPriceDetail>("/api/paket-price", { method: "POST", body: input, token }),
+  updatePaketPrice: (token: string, id: number, input: PaketPriceInput) =>
+    request<PaketPriceDetail>(`/api/paket-price/${id}`, { method: "PUT", body: input, token }),
+  deletePaketPrice: (token: string, id: number) => request<unknown>(`/api/paket-price/${id}`, { method: "DELETE", token }),
+  // Setting > Price
+  labPrice: (token: string) => request<{ price: LabPrice[] }>("/api/lab-price", { token }),
+  updateLabPrice: (token: string, id: number, price: number | null) =>
+    request<LabPrice>(`/api/lab-price/${id}`, { method: "PUT", body: { price }, token }),
   // Master Data > Lab
   lab: (token: string) => request<{ lab: Lab[] }>("/api/lab", { token }),
   labOptions: (token: string) => request<{ labSubMaster: LabSubMasterChoice[] }>("/api/lab/options", { token }),

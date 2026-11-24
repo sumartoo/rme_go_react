@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 # Order matters: dokter needs pasien and tindakan (whose --replace empties the
 # doctors' procedures), jamkes needs pasien, pengobatan needs pasien, dokter and
 # pendaftaran, and the detail lines need the sales.
-for s in obat tindakan penunjang icd perujuk-otc master-mcu lab-master lab-sub-master lab non-lab dokter-master dokter-mcu perusahaan pasien-mcu pasien jamkes dokter \
+for s in obat tindakan penunjang icd perujuk-otc master-mcu lab-master lab-sub-master lab non-lab paket-price dokter-master dokter-mcu perusahaan pasien-mcu pasien jamkes dokter \
          pendaftaran organisasi-lokasi pemeriksaan pengobatan pengobatan-detail \
          penerimaan-barang; do
   echo "===== import-lab-$s ====="

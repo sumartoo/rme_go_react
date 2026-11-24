@@ -26,12 +26,14 @@ import (
 	"github.com/example/be_jwt_golang/backend/internal/jamkes"
 	"github.com/example/be_jwt_golang/backend/internal/lab"
 	"github.com/example/be_jwt_golang/backend/internal/labmaster"
+	"github.com/example/be_jwt_golang/backend/internal/labprice"
 	"github.com/example/be_jwt_golang/backend/internal/labsubmaster"
 	"github.com/example/be_jwt_golang/backend/internal/mastermcu"
 	"github.com/example/be_jwt_golang/backend/internal/menu"
 	"github.com/example/be_jwt_golang/backend/internal/nonlab"
 	"github.com/example/be_jwt_golang/backend/internal/obat"
 	"github.com/example/be_jwt_golang/backend/internal/orglokasi"
+	"github.com/example/be_jwt_golang/backend/internal/paketprice"
 	"github.com/example/be_jwt_golang/backend/internal/pasien"
 	"github.com/example/be_jwt_golang/backend/internal/pasienmcu"
 	"github.com/example/be_jwt_golang/backend/internal/pendaftaran"
@@ -96,6 +98,8 @@ func main() {
 	principal.NewHandler(principal.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	icd.NewHandler(icd.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	lab.NewHandler(lab.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	paketprice.NewHandler(paketprice.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	labprice.NewHandler(labprice.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	labmaster.NewHandler(labmaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	labsubmaster.NewHandler(labsubmaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	nonlab.NewHandler(nonlab.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)

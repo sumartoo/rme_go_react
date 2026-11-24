@@ -66,7 +66,7 @@ export default function NonLabPage() {
       ) : !list ? (
         <p className="muted">Loading…</p>
       ) : (
-        <DataTable title="Non Lab" columns={columns} rows={list} rowKey={(n) => n.id} initialSort={{ key: "id", dir: "asc" }} defaultPageSize={20} />
+        <DataTable title="Non Lab" columns={columns} rows={list} rowKey={(n) => n.id} initialSort={{ key: "id", dir: "asc" }} defaultPageSize={10} />
       )}
       {editing && (
         <NonLabForm

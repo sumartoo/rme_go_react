@@ -43,6 +43,8 @@ import LabPage from "./pages/LabPage";
 import NonLabPage from "./pages/NonLabPage";
 import DokterMasterPage from "./pages/DokterMasterPage";
 import DokterMcuPage from "./pages/DokterMcuPage";
+import LabPricePage from "./pages/LabPricePage";
+import PaketPricePage from "./pages/PaketPricePage";
 import PrincipalPage from "./pages/PrincipalPage";
 import PenunjangPage from "./pages/PenunjangPage";
 import MenuPage from "./pages/MenuPage";
@@ -105,6 +107,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/master-data/non-lab" element={<MenuGuard><NonLabPage /></MenuGuard>} />
             <Route path="/master-data/dokter-master" element={<MenuGuard><DokterMasterPage /></MenuGuard>} />
             <Route path="/master-data/dokter" element={<MenuGuard><DokterMcuPage /></MenuGuard>} />
+            <Route path="/setting/price" element={<MenuGuard><LabPricePage /></MenuGuard>} />
+            <Route path="/setting/paket-price" element={<MenuGuard><PaketPricePage /></MenuGuard>} />
             <Route path="/master-data-klinik/penjual-otc" element={<MenuGuard><PerujukOtcPage /></MenuGuard>} />
             <Route path="/front-office-klinik/pendaftaran-pasien" element={<MenuGuard><PendaftaranPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan" element={<MenuGuard><PengobatanPage /></MenuGuard>} />

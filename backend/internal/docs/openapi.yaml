@@ -25,6 +25,8 @@ tags:
     description: |
       Master data pages. Access follows the page's menu item; stock and prices
       per branch are limited to the branches the caller is mapped to.
+  - name: setting
+    description: Setting pages (MCU prices and options). Access follows the page's menu item.
   - name: front-office
     description: Front Office Klinik pages; limited to the caller's branches.
   - name: transaksi-klinik
@@ -2526,6 +2528,227 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NonLab'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/paket-price:
+    get:
+      tags: [setting]
+      summary: List MCU packages (refpriceheader)
+      description: |
+        The Setting > Paket Price list, newest first: each package with its company (inner join, like the
+        original query), category and number of lab examinations. Deleted packages are hidden.
+        Requires the Setting > Paket Price menu.
+      operationId: listPaketPrice
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Packages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paket:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaketPrice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [setting]
+      summary: Create a package with its lab examinations
+      operationId: createPaketPrice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaketPriceInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaketPriceDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/paket-price/options:
+    get:
+      tags: [setting]
+      summary: Choices for the package form
+      description: Companies, categories and every lab examination (the form offers Non Active ones only when already chosen).
+      operationId: paketPriceOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Choices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perusahaan:
+                    type: array
+                    items: { type: object, properties: { id: { type: integer, description: refcompany.companyid }, nama: { type: string } } }
+                  kategori:
+                    type: array
+                    items: { type: object, properties: { id: { type: integer }, nama: { type: string, example: MCU Kategori 1 } } }
+                  labs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaketPriceLab'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/paket-price/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: refpriceheader.id
+        schema:
+          type: integer
+    get:
+      tags: [setting]
+      summary: A package with its lab examinations
+      operationId: getPaketPrice
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The package
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaketPriceDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [setting]
+      summary: Update a package and replace its lab examinations
+      operationId: updatePaketPrice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaketPriceInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaketPriceDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [setting]
+      summary: Delete (hide) a package
+      description: Sets isdeleted, deletedby and deleteddate; MCU transactions keep referring to the package.
+      operationId: deletePaketPrice
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/lab-price:
+    get:
+      tags: [setting]
+      summary: List lab examination prices (reflab)
+      description: |
+        The Setting > Price list: each lab examination with its Sub Master and Lab Master (inner joins,
+        like the original query), ordered by Lab ID; Non Active rows are included. Requires the Setting > Price menu.
+      operationId: listLabPrice
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Prices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  price:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabPrice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/lab-price/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: reflab.labid
+        schema:
+          type: integer
+    put:
+      tags: [setting]
+      summary: Change a lab examination's price
+      description: Only the price changes; modifiedby/modifieddate are recorded. null clears the price.
+      operationId: updateLabPrice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price: { type: number, nullable: true, minimum: 0, example: 95000 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabPrice'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -6212,6 +6435,66 @@ components:
         - type: object
           properties:
             id: { type: integer }
+
+    PaketPriceInput:
+      type: object
+      required: [idPerusahaan, nama, fromDate, toDate, price, labIds]
+      properties:
+        idPerusahaan: { type: integer, description: refcompany.companyid, example: 1 }
+        nama: { type: string, maxLength: 30, example: 4 IN 1 }
+        isPaket: { type: boolean }
+        idKategori: { type: integer, nullable: true, description: refcategory.id, example: 3 }
+        fromDate: { type: string, format: date, example: '2026-11-13' }
+        toDate: { type: string, format: date, example: '2026-12-13' }
+        price: { type: number, minimum: 0, example: 94000 }
+        isActive: { type: boolean, description: "isactive 1 (Aktif) or 0 (Non Aktif)" }
+        labIds: { type: array, minItems: 1, items: { type: integer, description: reflab.labid } }
+
+    PaketPrice:
+      type: object
+      properties:
+        id: { type: integer }
+        idPerusahaan: { type: integer }
+        perusahaan: { type: string, example: UMUM }
+        nama: { type: string, example: 4 IN 1 }
+        isPaket: { type: boolean }
+        idKategori: { type: integer, nullable: true }
+        kategori: { type: string, example: MCU Kategori 3 }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        price: { type: number, nullable: true, example: 94000 }
+        isActive: { type: boolean }
+        jumlahLab: { type: integer, description: Lab examinations in the package }
+
+    PaketPriceLab:
+      type: object
+      properties:
+        id: { type: integer, description: reflab.labid }
+        labMaster: { type: string }
+        labSubMaster: { type: string }
+        nama: { type: string }
+        price: { type: number, nullable: true, description: reflab.price }
+        isActive: { type: boolean }
+
+    PaketPriceDetail:
+      allOf:
+        - $ref: '#/components/schemas/PaketPrice'
+        - type: object
+          properties:
+            labs:
+              type: array
+              items:
+                $ref: '#/components/schemas/PaketPriceLab'
+
+    LabPrice:
+      type: object
+      properties:
+        id: { type: integer, description: reflab.labid }
+        labMaster: { type: string, example: KIMIA KLINIK }
+        labSubMaster: { type: string, example: FAAL HATI }
+        nama: { type: string, description: reflab.labname, example: SGOT }
+        price: { type: number, nullable: true, example: 95000 }
+        isActive: { type: boolean, description: NOT reflab.isdeleted }
 
     LabInput:
       type: object

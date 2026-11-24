@@ -441,6 +441,25 @@ LAB_PASSWORD=... scripts/import-lab-lab-master.sh            # migration 043_lab
 LAB_PASSWORD=... scripts/import-lab-lab-master.sh --replace
 ```
 
+## Setting › Paket Price
+
+`/setting/paket-price` lists the MCU packages per company (`refpriceheader`, 364 rows): ID, Perusahaan (`refcompany`, inner join like the original query), Nama Paket, Paket (Ya/Tidak), Kategori (`refcategory`), Price (`94.000,00`) and Status (`isactive`: Aktif/Non Aktif), newest first. Dari/Sampai and Jumlah Lab are under Column visibility. Each row has:
+
+- ☰ — a read-only view of the package and its lab examinations (`refpricedetail` → `reflab`), with the examinations' list prices and their total;
+- pencil — edit the package: Perusahaan, Nama Paket (30), Kategori, Dari/Sampai Tanggal, Price, Paket, Status and the lab examinations (a searchable checklist grouped by Lab Master › Sub Master; Non Active examinations only when already in the package). Saving replaces the package's examinations;
+- trash — delete after a confirmation. It only hides the package (`isdeleted`, `deletedby`, `deleteddate`), because MCU transactions refer to it (`trxmcudetail.paketid` in lab).
+
+**+ Add** opens the same form. The original screen's **Tools** button is not built yet. `refpricedetail`'s `iscek`/`price`/`percentage1..3` are empty in lab and kept as they are.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-paket-price.sh            # migration 049_paket_price.sql creates the tables
+LAB_PASSWORD=... scripts/import-lab-paket-price.sh --replace
+```
+
+## Setting › Price
+
+`/setting/price` lists the price of each lab examination (`reflab`, 593 rows): Lab ID, Lab Master, Sub Master Name, Lab and Price (formatted like `95.000,00`), ordered by Lab ID (10 rows per page by default). As in the original query, rows inner-join their Sub Master and Lab Master, and Non Active rows are listed too. The pencil changes only the price (empty clears it) and records `modifiedby`/`modifieddate`; everything else about an examination is edited in Master Data › Lab. There is no Add: examinations are created in Master Data › Lab. The data comes from `scripts/import-lab-lab.sh`.
+
 ## Master Data › Dokter (MCU doctors)
 
 `/master-data/dokter` lists the MCU doctors (`refdoctor`: Dokter Code, Dokter Name, Dokter Master Name from `refdoctormaster`, Percentage Fee), sorted by code like the original screen. They are separate from the clinic doctors of Master Data Klinik › Dokter (`refdokter`). **+ Add** and the pencil open a form with Dokter Code (required on add, at most 20 characters, unique; it is the primary key, so it cannot be changed later), Dokter Name (required, 50), Dokter Master (required, a list) and Percentage Fee (optional, 0–100). There is no delete.
@@ -461,7 +480,7 @@ LAB_PASSWORD=... scripts/import-lab-dokter-master.sh --replace
 
 ## Master Data › Non Lab
 
-`/master-data/non-lab` lists the services sold with an MCU that are not lab examinations (`refnonlab`: ID, Non Lab Name, Price), ordered by ID with 20 rows per page like the original screen. **+ Add** and the pencil open a form with Non Lab Name (required, at most 100 characters) and Price (optional, from 0); saves record `createby`/`modifiedby` and the time. There is no delete, and soft-deleted rows (`isdeleted`) are hidden.
+`/master-data/non-lab` lists the services sold with an MCU that are not lab examinations (`refnonlab`: ID, Non Lab Name, Price), ordered by ID (10 rows per page by default). **+ Add** and the pencil open a form with Non Lab Name (required, at most 100 characters) and Price (optional, from 0); saves record `createby`/`modifiedby` and the time. There is no delete, and soft-deleted rows (`isdeleted`) are hidden.
 
 ```bash
 LAB_PASSWORD=... scripts/import-lab-non-lab.sh            # migration 046_non_lab.sql creates the table
@@ -863,7 +882,7 @@ LAB_PASSWORD=... scripts/import-lab-organisasi-lokasi.sh --replace
   - a sale without examinations has one row with an empty Penunjang and Total 0, as on the legacy screen.
 - **Columns:** Tanggal, No RM, Pasien, Dokter Eksternal, Jenis Rawat, Penunjang, Total, Cabang, Status.
 - **Filters:**
-  - date range (default yesterday and today, H-1 to H) and 20 rows a page, as in the legacy report;
+  - date range (default yesterday and today, H-1 to H, as in the legacy report) and 10 rows a page by default;
   - Cari: Nama Pasien, Dokter Eksternal, Status;
   - Cabang, search, sort and export.
 - **Endpoints:** `GET /api/report-klinik/rujukan` and `/options`, guarded by the report's menu and limited to the caller's branches.
@@ -1052,6 +1071,8 @@ backend/
   internal/principal          drug principals (/api/principal)
   internal/icd                ICD-X codes with server-side paging (/api/icd)
   internal/lab                lab examinations, Master Data > Lab (/api/lab)
+  internal/paketprice         MCU packages, Setting > Paket Price (/api/paket-price)
+  internal/labprice           lab examination prices, Setting > Price (/api/lab-price)
   internal/labmaster          lab examination groups, Master Data > Lab Master (/api/lab-master)
   internal/labsubmaster       lab examination subgroups, Master Data > Lab Sub Master (/api/lab-sub-master)
   internal/doktermcu          MCU doctors, Master Data > Dokter (/api/dokter-mcu)
@@ -1075,7 +1096,7 @@ frontend/
   src/components/FormKit      modal form, fields and amount inputs for master-data dialogs
   src/components/barcode.ts   Code 128 barcode (SVG) for patient cards
   src/components/dates.ts     today, addDays, DD/MM/YYYY formatting and age
-  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, MasterMcuPage, PerusahaanPage, PasienMcuPage, LabMasterPage, LabSubMasterPage, LabPage, NonLabPage, DokterMasterPage, DokterMcuPage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
+  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, MasterMcuPage, PerusahaanPage, PasienMcuPage, LabMasterPage, LabSubMasterPage, LabPage, NonLabPage, DokterMasterPage, DokterMcuPage, LabPricePage, PaketPricePage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
 scripts/import-lab-obat.sh    copies drugs and stock from the legacy lab database
 scripts/import-lab-tindakan.sh copies procedures and prices per branch from lab
 scripts/import-lab-penunjang.sh copies supporting examinations and prices per branch from lab
