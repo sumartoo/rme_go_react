@@ -19,9 +19,15 @@ export default function ObatLookup({
   inList,
   onPick,
   onClose,
+  load = api.pengobatanObat,
+  checkStock = true,
 }: {
   cabang: string;
   branchName: string;
+  /** Where the drugs come from; Pemeriksaan Dokter uses its own endpoint. */
+  load?: (token: string, cabang: string) => Promise<{ rows: PengobatanObat[] }>;
+  /** Refuse more than the branch's stock (a sale); a prescription does not check it. */
+  checkStock?: boolean;
   /** Quantity of each drug already in the list, to check the stock. */
   inList: Map<number, number>;
   onPick: (o: PengobatanObat, byk: number) => void;
@@ -35,8 +41,7 @@ export default function ObatLookup({
 
   useEffect(() => {
     if (!token) return;
-    api
-      .pengobatanObat(token, cabang)
+    load(token, cabang)
       .then((res) => setRows(res.rows))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) logout("Your session has expired. Please log in again.");
@@ -52,7 +57,7 @@ export default function ObatLookup({
       return;
     }
     const already = inList.get(o.id) ?? 0;
-    if (already + byk > o.stok) {
+    if (checkStock && already + byk > o.stok) {
       setError(
         `Stok ${o.nama} tidak cukup: stok ${qtyFmt.format(o.stok)}${already ? `, sudah di daftar ${qtyFmt.format(already)}` : ""}, diminta ${qtyFmt.format(byk)}.`,
       );

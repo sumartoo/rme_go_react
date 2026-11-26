@@ -6192,6 +6192,618 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: The visit is closed or cancelled
+  /api/pemeriksaan-perawat:
+    get:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - poli registrations at your branches, newest first
+      description: Registrations whose service is a doctor's examination (refjenisrawat.ispemeriksaan), with the queue number, Dokter PJ and keluhan utama. Needs the Pemeriksaan Perawat menu.
+      operationId: listPemeriksaanPerawat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: from, in: query, description: 'YYYY-MM-DD, default yesterday (clinic time)', schema: { type: string, format: date } }
+        - { name: to, in: query, description: 'YYYY-MM-DD, default today (clinic time)', schema: { type: string, format: date } }
+        - { name: cabang, in: query, description: One of your branches; default all of them, schema: { type: string } }
+        - { name: status, in: query, description: Visit status (refstatustransaksi id), schema: { type: integer } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [noAntrianPoli, tglMasuk, pelayanan, dokter, noRm, nama, umur, alamat, keluhanUtama, cabang, status] } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000 } }
+      responses:
+        '200':
+          description: rows, total, unfilteredTotal, from, to
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-perawat/options:
+    get:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - your branches, the visit statuses and today's clinic date
+      operationId: pemeriksaanPerawatOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: status, branches, today
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-perawat/dokter:
+    get:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - the Dokter PJ lookup (active doctors of one of your branches)
+      operationId: pemeriksaanPerawatDokter
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: rows of id, nama, jenis
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-perawat/pendaftaran/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - a registration at your branches with its patient and Dokter PJ
+      description: editable is false once the visit is closed or cancelled. Another branch's registration answers 404.
+      operationId: pemeriksaanPerawatPendaftaran
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: pendaftaran, editable
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/pemeriksaan-perawat/pemeriksaan/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - the examination of a registration (same as GET /api/pengobatan/pemeriksaan/{idKun})
+      operationId: getPemeriksaanPerawat
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Examination, or null when none is saved yet
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [transaksi-klinik]
+      summary: Pemeriksaan Perawat - save the examination and Dokter PJ (same body as PUT /api/pengobatan/pemeriksaan/{idKun})
+      operationId: savePemeriksaanPerawat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Saved; the stored examination
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The visit is closed or cancelled
+  /api/pemeriksaan-dokter:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - poli registrations at your branches (same query as /api/pemeriksaan-perawat, plus dokter = Dokter PJ id)'
+      operationId: listPemeriksaanDokter
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: dokter, in: query, description: Dokter PJ (refmdokter id), schema: { type: integer } }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-dokter/options:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - your branches, their active doctors, the visit statuses and today'
+      operationId: pemeriksaanDokterOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-dokter/dokter:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - the Dokter PJ lookup of one of your branches'
+      operationId: pemeriksaanDokterDokter
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-dokter/obat:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - the drug lookup of one of your branches (price and stock)'
+      operationId: pemeriksaanDokterObat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-dokter/icd:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - the ICD-X lookup (same query as /api/pengobatan/icd)'
+      operationId: pemeriksaanDokterIcd
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/pemeriksaan-dokter/pendaftaran/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - a registration with its patient and Dokter PJ; editable is false only for a cancelled visit'
+      operationId: pemeriksaanDokterPendaftaran
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/pemeriksaan-dokter/pemeriksaan/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - the examination (trxpemeriksaan)'
+      operationId: getPemeriksaanDokter
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - save the examination and Dokter PJ (same body as PUT /api/pengobatan/pemeriksaan/{idKun}); a closed visit can still change'
+      operationId: savePemeriksaanDokter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The visit is cancelled
+  /api/pemeriksaan-dokter/resep/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - the doctor's prescription and diagnoses (trxjualobatdokter, trxjualdiagnosadokter): obat[], diagnosa[]'
+      operationId: getResepDokter
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [transaksi-klinik]
+      summary: 'Pemeriksaan Dokter - replace the prescription and diagnoses. Body: obat [{idObat, byk > 0, dosis <= 100 chars}], diagnosa [reficd id] (at most 50 each)'
+      operationId: saveResepDokter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The visit is cancelled
+  /api/proses-obat:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Proses Obat - poli registrations at your branches (same query as /api/pemeriksaan-perawat)'
+      operationId: listProsesObat
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/proses-obat/options:
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Proses Obat - your branches, the visit statuses and today'
+      operationId: prosesObatOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/proses-obat/pendaftaran/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Proses Obat - a registration with its patient and Dokter PJ (editable is always false)'
+      operationId: prosesObatPendaftaran
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/proses-obat/pemeriksaan/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Proses Obat - the examination (read-only)'
+      operationId: prosesObatPemeriksaan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/proses-obat/resep/{idKun}:
+    parameters:
+      - { name: idKun, in: path, required: true, description: trxpendaftaran id, schema: { type: integer } }
+    get:
+      tags: [transaksi-klinik]
+      summary: 'Proses Obat - the doctor's prescription and diagnoses (read-only)'
+      operationId: prosesObatResep
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/mcu-pendaftaran:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the MCU registrations (trxmcuheader), newest MCU date first'
+      operationId: listMcuPendaftaran
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: from, in: query, description: 'YYYY-MM-DD on the MCU date, default 29 days before today', schema: { type: string, format: date } }
+        - { name: to, in: query, description: 'YYYY-MM-DD, default today (clinic time)', schema: { type: string, format: date } }
+        - { name: status, in: query, schema: { type: string, enum: [New, Close, Cancel] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [id, mcuDate, rm, status, nama, perusahaan, kategori, price, createBy] } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000 } }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - register each patient with the same lines (one trxmcuheader per patient, status New). Body: mcuDate, kategoriId, infoId, pasienIds (create only), labIds, paketIds, nonLabIds, dokter (codes). Prices come from the master data'
+      operationId: createMcuPendaftaran
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/options:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - MCU Kategori, MCU Info, statuses and today'
+      operationId: mcuPendaftaranOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/pasien:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the patient lookup (refpasien), paged'
+      operationId: mcuPendaftaranPasien
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: size, in: query, schema: { type: integer, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/lab:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the General lookup (reflab with master and sub master, price)'
+      operationId: mcuPendaftaranLab
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/paket:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the active MCU packages (refpriceheader.ispaket) with company and price'
+      operationId: mcuPendaftaranPaket
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/non-lab:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the Non Lab lookup (refnonlab)'
+      operationId: mcuPendaftaranNonLab
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/dokter:
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - the MCU doctor lookup (refdoctor)'
+      operationId: mcuPendaftaranDokter
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu-pendaftaran/{id}:
+    parameters:
+      - { name: id, in: path, required: true, description: trxmcuheader id, schema: { type: integer } }
+    get:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - a registration with its patient, General, Paket, Non Lab and Dokter lines'
+      operationId: getMcuPendaftaran
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - replace a New registration's date, choices and lines (the patient stays). Body: mcuDate, kategoriId, infoId, pasienIds (create only), labIds, paketIds, nonLabIds, dokter (codes). Prices come from the master data'
+      operationId: updateMcuPendaftaran
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The registration is no longer New
+  /api/mcu-pendaftaran/{id}/cancel:
+    parameters:
+      - { name: id, in: path, required: true, description: trxmcuheader id, schema: { type: integer } }
+    post:
+      tags: [mcu]
+      summary: 'MCU Pendaftaran - cancel a New registration. Body: reason (required, at most 300 characters)'
+      operationId: cancelMcuPendaftaran
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The registration is no longer New
   /api/pengobatan/kuitansi/{id}:
     parameters:
       - { name: id, in: path, required: true, description: trxjual id, schema: { type: integer } }

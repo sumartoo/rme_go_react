@@ -62,6 +62,8 @@ type fakeRepo struct {
 	lastTindakan  string
 	lastPenunjang string
 	lastICD       icd.ListParams
+	lastPerawat   PerawatParams
+	resep         map[int]ResepInput
 	regs2         map[int][2]any // idKun -> {cabang, status}
 	saved         map[int]Pemeriksaan
 	savedBy       string
@@ -129,6 +131,44 @@ func (f *fakeRepo) GetPemeriksaan(_ context.Context, idKun int) (*PemeriksaanRec
 		return nil, nil
 	}
 	return &PemeriksaanRecord{Pemeriksaan: p, UpdatedBy: f.savedBy}, nil
+}
+func (f *fakeRepo) PerawatList(_ context.Context, p PerawatParams) (PerawatPage, error) {
+	f.lastPerawat = p
+	return PerawatPage{Rows: []PerawatRow{}}, nil
+}
+func (f *fakeRepo) RegByID(_ context.Context, idKun int) (RegRow, error) {
+	r, ok := f.regs2[idKun]
+	if !ok {
+		return RegRow{}, ErrRegNotFound
+	}
+	return RegRow{ID: idKun, Cabang: r[0].(string)}, nil
+}
+func (f *fakeRepo) DokterAtBranches(_ context.Context, branches []string) ([]Dokter, error) {
+	return []Dokter{{ID: 5, Nama: "dr. A"}}, nil
+}
+func (f *fakeRepo) GetResep(_ context.Context, idKun int) (Resep, error) {
+	res := Resep{Obat: []ResepObat{}, Diagnosa: []ResepDiagnosa{}}
+	if in, ok := f.resep[idKun]; ok {
+		for _, o := range in.Obat {
+			res.Obat = append(res.Obat, ResepObat{IDObat: o.IDObat, Byk: o.Byk, Dosis: o.Dosis})
+		}
+		for _, id := range in.Diagnosa {
+			res.Diagnosa = append(res.Diagnosa, ResepDiagnosa{ICDID: id})
+		}
+	}
+	return res, nil
+}
+func (f *fakeRepo) SaveResep(_ context.Context, idKun int, in ResepInput) error {
+	for _, o := range in.Obat {
+		if o.IDObat == 999 {
+			return ErrUnknownObat
+		}
+	}
+	if f.resep == nil {
+		f.resep = map[int]ResepInput{}
+	}
+	f.resep[idKun] = in
+	return nil
 }
 func (f *fakeRepo) SavePemeriksaan(_ context.Context, idKun int, in Pemeriksaan, user string) error {
 	if in.IDDokter != nil && *in.IDDokter == 999 {
@@ -199,8 +239,8 @@ func newServer(t *testing.T) *server {
 	tokens := auth.NewTokenManager("test-secret-that-is-at-least-32-characters", time.Minute)
 	guarded := map[string]int{}
 	requireMenu := func(path string) func(http.Handler) http.Handler {
-		if path != PagePath && path != ReportPath {
-			t.Fatalf("guarded by %q, want %q or %q", path, PagePath, ReportPath)
+		if path != PagePath && path != ReportPath && path != PerawatPath && path != DokterPath && path != ProsesObatPath {
+			t.Fatalf("guarded by %q", path)
 		}
 		guarded[path]++
 		return func(next http.Handler) http.Handler { return next }
@@ -210,8 +250,8 @@ func newServer(t *testing.T) *server {
 	mux := http.NewServeMux()
 	h.Routes(mux, tokens.Middleware, requireMenu)
 	// Raw Data Pengobatan (the list and its options) is guarded by the report menu.
-	if guarded[PagePath] != 16 || guarded[ReportPath] != 2 {
-		t.Fatalf("routes guarded: %v, want 16 by %s and 2 by %s", guarded, PagePath, ReportPath)
+	if guarded[PagePath] != 16 || guarded[ReportPath] != 2 || guarded[PerawatPath] != 6 || guarded[DokterPath] != 10 || guarded[ProsesObatPath] != 5 {
+		t.Fatalf("routes guarded: %v", guarded)
 	}
 	return &server{mux: mux, tokens: tokens, repo: repo}
 }
@@ -738,5 +778,139 @@ func TestRawDataPengobatan(t *testing.T) {
 	}
 	if code, _ := s.get(t, "", "/api/report-klinik/raw-data-pengobatan"); code != http.StatusUnauthorized {
 		t.Errorf("no token: %d", code)
+	}
+}
+
+func TestPerawatWhere(t *testing.T) {
+	sql, args := perawatWhere(PerawatParams{Branches: []string{"MED"}, From: "2026-11-18", To: "2026-11-19", IDStatus: ptr(4), Search: "a%"}, true)
+	for _, want := range []string{"d.cabang = ANY($1)", "d.tgl_masuk >= $2::date", "d.tgl_masuk < $3::date + 1",
+		"COALESCE(r.ispemeriksaan, false)", "d.id_statustr = $4", "p.nama ILIKE $5", "d.id::text = $6"} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("perawatWhere missing %q: %s", want, sql)
+		}
+	}
+	if len(args) != 6 || args[4] != `%a\%%` || args[5] != "a%" {
+		t.Errorf("args = %v", args)
+	}
+	if sql, args := perawatWhere(PerawatParams{Branches: []string{"MED"}, From: "x", To: "y", Search: "z"}, false); strings.Contains(sql, "ILIKE") || len(args) != 3 {
+		t.Errorf("without search: %s %v", sql, args)
+	}
+}
+
+func TestPerawat(t *testing.T) {
+	s := newServer(t)
+	code, out := s.get(t, csID, "/api/pemeriksaan-perawat")
+	pp := s.repo.lastPerawat
+	if code != http.StatusOK || pp.From != "2026-11-18" || pp.To != "2026-11-19" || strings.Join(pp.Branches, ",") != "KMJ,MED" ||
+		pp.Sort != "tglMasuk" || !pp.Desc || pp.Limit != 10 || out["to"] != "2026-11-19" {
+		t.Fatalf("default list (yesterday and today in Jakarta, newest first): %d %v %+v", code, out, pp)
+	}
+	s.get(t, csID, "/api/pemeriksaan-perawat?cabang=med&status=3&q=+siti+&sort=nama&dir=asc&page=2")
+	pp = s.repo.lastPerawat
+	if strings.Join(pp.Branches, ",") != "MED" || *pp.IDStatus != 3 || pp.Search != "siti" || pp.Sort != "nama" || pp.Desc || pp.Offset != 10 {
+		t.Errorf("filtered list: %+v", pp)
+	}
+	if code, _ := s.get(t, csID, "/api/pemeriksaan-perawat?cabang=XYZ"); code != http.StatusForbidden {
+		t.Errorf("other branch: %d, want 403", code)
+	}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-perawat/options"); code != http.StatusOK || out["today"] != "2026-11-19" {
+		t.Errorf("options: %d %v", code, out)
+	}
+	s.repo.regs2 = map[int][2]any{7: {"MED", 4}, 8: {"MED", 6}, 9: {"CTM", 4}}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-perawat/pendaftaran/7"); code != http.StatusOK || out["editable"] != true {
+		t.Errorf("reg 7: %d %v", code, out)
+	}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-perawat/pendaftaran/8"); code != http.StatusOK || out["editable"] != false {
+		t.Errorf("closed reg 8: %d %v", code, out)
+	}
+	if code, _ := s.get(t, csID, "/api/pemeriksaan-perawat/pendaftaran/9"); code != http.StatusNotFound {
+		t.Errorf("other branch's reg: %d, want 404", code)
+	}
+}
+
+func (s *server) sendJSON(t *testing.T, method, path string, body any) (int, map[string]any) {
+	t.Helper()
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest(method, path, bytes.NewReader(b))
+	tok, _, _ := s.tokens.Generate(csID, "cs@medika.com")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rec := httptest.NewRecorder()
+	s.mux.ServeHTTP(rec, req)
+	out := map[string]any{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	return rec.Code, out
+}
+
+func TestPemeriksaanDokter(t *testing.T) {
+	s := newServer(t)
+	s.repo.regs2 = map[int][2]any{7: {"MED", 2}, 8: {"MED", 6}, 9: {"CTM", 4}}
+	s.get(t, csID, "/api/pemeriksaan-dokter?dokter=5")
+	if p := s.repo.lastPerawat; p.IDDokter == nil || *p.IDDokter != 5 {
+		t.Errorf("dokter filter: %+v", p)
+	}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-dokter/options"); code != http.StatusOK || len(out["dokter"].([]any)) != 1 {
+		t.Errorf("options: %d %v", code, out)
+	}
+	// A closed visit can still change for the doctor, not for the nurse; a cancelled one cannot.
+	if code, out := s.get(t, csID, "/api/pemeriksaan-dokter/pendaftaran/7"); code != http.StatusOK || out["editable"] != true {
+		t.Errorf("closed reg for the doctor: %d %v", code, out)
+	}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-perawat/pendaftaran/7"); code != http.StatusOK || out["editable"] != false {
+		t.Errorf("closed reg for the nurse: %d %v", code, out)
+	}
+	if code, _ := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/pemeriksaan/7", map[string]any{"keluhanUtama": "pusing"}); code != http.StatusOK {
+		t.Errorf("doctor saves a closed visit: %d", code)
+	}
+	if code, _ := s.sendJSON(t, "PUT", "/api/pemeriksaan-perawat/pemeriksaan/7", map[string]any{"keluhanUtama": "pusing"}); code != http.StatusConflict {
+		t.Errorf("nurse saves a closed visit: %d, want 409", code)
+	}
+
+	body := map[string]any{"obat": []map[string]any{{"idObat": 3, "byk": 10, "dosis": " 3x1 "}}, "diagnosa": []int{4, 6}}
+	code, out := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/resep/7", body)
+	if code != http.StatusOK || len(out["obat"].([]any)) != 1 || len(out["diagnosa"].([]any)) != 2 || s.repo.resep[7].Obat[0].Dosis != "3x1" {
+		t.Fatalf("save resep: %d %v", code, out)
+	}
+	if code, out := s.get(t, csID, "/api/pemeriksaan-dokter/resep/7"); code != http.StatusOK || len(out["obat"].([]any)) != 1 {
+		t.Errorf("get resep: %d %v", code, out)
+	}
+	if code, _ := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/resep/8", body); code != http.StatusConflict {
+		t.Errorf("cancelled visit: %d, want 409", code)
+	}
+	if code, _ := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/resep/9", body); code != http.StatusNotFound {
+		t.Errorf("other branch: %d, want 404", code)
+	}
+	for _, bad := range []map[string]any{
+		{"obat": []map[string]any{{"idObat": 3, "byk": 0}}},
+		{"obat": []map[string]any{{"idObat": 0, "byk": 1}}},
+		{"diagnosa": []int{4, 4}},
+	} {
+		if code, _ := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/resep/7", bad); code != http.StatusBadRequest {
+			t.Errorf("%v: %d, want 400", bad, code)
+		}
+	}
+	if code, out := s.sendJSON(t, "PUT", "/api/pemeriksaan-dokter/resep/7", map[string]any{"obat": []map[string]any{{"idObat": 999, "byk": 1}}}); code != http.StatusBadRequest || out["errors"] == nil {
+		t.Errorf("unknown drug: %d %v", code, out)
+	}
+}
+
+func TestProsesObat(t *testing.T) {
+	s := newServer(t)
+	s.repo.regs2 = map[int][2]any{7: {"MED", 5}, 9: {"CTM", 5}}
+	s.get(t, csID, "/api/proses-obat?status=5")
+	if p := s.repo.lastPerawat; p.IDStatus == nil || *p.IDStatus != 5 {
+		t.Errorf("status filter: %+v", p)
+	}
+	// View only: never editable, and there is no PUT.
+	if code, out := s.get(t, csID, "/api/proses-obat/pendaftaran/7"); code != http.StatusOK || out["editable"] != false {
+		t.Errorf("reg 7: %d %v", code, out)
+	}
+	if code, _ := s.get(t, csID, "/api/proses-obat/resep/7"); code != http.StatusOK {
+		t.Errorf("resep 7: %d", code)
+	}
+	if code, _ := s.get(t, csID, "/api/proses-obat/resep/9"); code != http.StatusNotFound {
+		t.Errorf("other branch: %d, want 404", code)
+	}
+	if code, _ := s.sendJSON(t, "PUT", "/api/proses-obat/resep/7", map[string]any{}); code != http.StatusMethodNotAllowed {
+		t.Errorf("PUT: %d, want 405", code)
 	}
 }

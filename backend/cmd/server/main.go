@@ -31,6 +31,7 @@ import (
 	"github.com/example/be_jwt_golang/backend/internal/labprice"
 	"github.com/example/be_jwt_golang/backend/internal/labsubmaster"
 	"github.com/example/be_jwt_golang/backend/internal/mastermcu"
+	"github.com/example/be_jwt_golang/backend/internal/mcudaftar"
 	"github.com/example/be_jwt_golang/backend/internal/mcuhasil"
 	"github.com/example/be_jwt_golang/backend/internal/menu"
 	"github.com/example/be_jwt_golang/backend/internal/nonlab"
@@ -132,6 +133,7 @@ func main() {
 	analitik.NewHandler(analitik.NewPostgresRepository(pool), assistant).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	riwayatpasien.NewHandler(riwayatpasien.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	mcuhasil.NewHandler(mcuhasil.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	mcudaftar.NewHandler(mcudaftar.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	// Part 2: complaints analysed by AI through n8n (JWT for the app, shared secret for n8n's callback).
 	complaintRepo := complaint.NewPostgresRepository(pool)
 	callbackURL := ""

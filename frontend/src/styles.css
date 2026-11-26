@@ -1235,3 +1235,8 @@ p.mcu-abnormal, td.mcu-abnormal, .mcu-plate.mcu-abnormal span { color: var(--err
 @media (max-width: 640px) {
   .mcu-field { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* MCU > Pendaftaran form: the date and choices above the patients, and the totals line. */
+.mcu-daftar-head { flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+.mcu-daftar-head label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; min-width: 180px; }
+.mcu-daftar-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; margin: 16px 0 8px; padding: 12px 16px; border-radius: 8px; background: var(--card); border: 1px solid var(--border); }

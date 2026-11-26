@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 # doctors' procedures), jamkes needs pasien, pengobatan needs pasien, dokter and
 # pendaftaran, and the detail lines need the sales.
 for s in obat stok-adjusment trxobat tindakan penunjang icd perujuk-otc master-mcu mcu lab-master lab-sub-master lab non-lab paket-price setting-barcode dokter-master dokter-mcu perusahaan pasien-mcu pasien jamkes dokter \
-         pendaftaran organisasi-lokasi pemeriksaan pengobatan pengobatan-detail \
+         pendaftaran organisasi-lokasi pemeriksaan pemeriksaan-dokter pengobatan pengobatan-detail \
          penerimaan-barang; do
   echo "===== import-lab-$s ====="
   bash "scripts/import-lab-$s.sh" "$@"

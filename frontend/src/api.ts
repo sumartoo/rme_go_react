@@ -852,6 +852,182 @@ export interface PemeriksaanRecord extends PemeriksaanInput {
   updatedAt: string | null;
 }
 
+/** MCU > Pendaftaran: a registration in the list. */
+export interface McuDaftarRow {
+  id: number;
+  mcuDate: string | null;
+  rm: string;
+  status: string;
+  nama: string;
+  perusahaan: string;
+  kategori: string;
+  price: number;
+  createBy: string;
+}
+
+export interface McuDaftarQuery {
+  from: string;
+  to: string;
+  page: number;
+  size: number;
+  q?: string;
+  sort?: string;
+  dir?: string;
+  status?: string;
+}
+
+export interface McuDaftarOptions {
+  kategori: LookupOption[];
+  info: LookupOption[];
+  status: string[];
+  today: string;
+}
+
+/** An MCU patient in the registration form's lookup. */
+export interface McuDaftarPasien {
+  id: number;
+  rm: string;
+  nama: string;
+  kodePerusahaan: string;
+  perusahaan: string;
+  nik: string;
+}
+
+/** A General lab examination with its price. */
+export interface McuDaftarLab {
+  id: number;
+  master: string;
+  subMaster: string;
+  nama: string;
+  price: number;
+}
+
+/** An MCU package with its company and price. */
+export interface McuDaftarPaket {
+  id: number;
+  nama: string;
+  perusahaan: string;
+  kategori: string;
+  price: number;
+}
+
+export interface McuDaftarNonLab {
+  id: number;
+  nama: string;
+  price: number;
+}
+
+export interface McuDaftarDokter {
+  kode: string;
+  nama: string;
+  master: string;
+  feePercentage: number;
+}
+
+/** An ordered line of a saved registration. */
+export interface McuDaftarLine {
+  id: number;
+  nama: string;
+  /** General: master / sub master; Paket: perusahaan. */
+  extra: string;
+  price: number;
+}
+
+export interface McuDaftarDetail {
+  id: number;
+  mcuDate: string | null;
+  status: string;
+  kategoriId: number | null;
+  infoId: number | null;
+  price: number;
+  createBy: string;
+  createdDate: string | null;
+  cancelRemarks: string;
+  pasien: McuDaftarPasien;
+  lab: McuDaftarLine[];
+  paket: McuDaftarLine[];
+  nonLab: McuDaftarLine[];
+  dokter: McuDaftarDokter[];
+}
+
+/** The registration form as sent; the server prices the lines. */
+export interface McuDaftarInput {
+  mcuDate: string;
+  kategoriId: number;
+  infoId: number | null;
+  /** Create only: one registration per patient. */
+  pasienIds?: number[];
+  labIds: number[];
+  paketIds: number[];
+  nonLabIds: number[];
+  dokter: string[];
+}
+
+/** Which API serves an examination: each is guarded by its own menu. */
+export type PemeriksaanBase = "/api/pengobatan" | "/api/pemeriksaan-perawat" | "/api/pemeriksaan-dokter" | "/api/proses-obat";
+
+/** Transaksi Klinik > Pemeriksaan Perawat filter choices. */
+export interface PerawatOptions {
+  status: LookupOption[];
+  branches: { kode: string; nama: string }[];
+  /** Today in the clinic's time zone. */
+  today: string;
+}
+
+/** A poli registration in the Pemeriksaan Perawat list. */
+export interface PerawatRow extends PengobatanPendaftaran {
+  noAntrianPoli: string;
+  keluhanUtama: string;
+}
+
+export interface PerawatQuery {
+  from: string;
+  to: string;
+  page: number;
+  size: number;
+  q?: string;
+  sort?: string;
+  dir?: string;
+  cabang?: string;
+  status?: number;
+  /** Dokter PJ (Pemeriksaan Dokter only). */
+  dokter?: number;
+}
+
+/** Transaksi Klinik > Pemeriksaan Dokter filter choices. */
+export interface DokterPeriksaOptions extends PerawatOptions {
+  /** Active doctors of your branches, for the Dokter filter. */
+  dokter: PengobatanDokter[];
+}
+
+/** A drug the doctor prescribed for a registration. */
+export interface ResepObat {
+  idObat: number;
+  nama: string;
+  satuan: string;
+  byk: number;
+  dosis: string;
+}
+
+/** A diagnosis the doctor recorded for a registration. */
+export interface ResepDiagnosa {
+  icdId: number;
+  kode: string;
+  nama: string;
+}
+
+/** The doctor's prescription and diagnoses of a registration. */
+export interface Resep {
+  obat: ResepObat[];
+  diagnosa: ResepDiagnosa[];
+}
+
+/** Replaces the prescription and diagnoses of a registration. */
+export interface ResepInput {
+  obat: { idObat: number; byk: number; dosis: string }[];
+  diagnosa: number[];
+}
+
 /** The Pengobatan form as sent by Save; the server prices it from the master data. */
 export interface PengobatanSaveInput {
   cabang: string;
@@ -2441,10 +2617,73 @@ export const api = {
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
     return request<{ rows: PengobatanIcd[]; total: number; unfilteredTotal: number }>(`/api/pengobatan/icd?${qs}`, { token });
   },
-  getPemeriksaan: (token: string, idKun: number) =>
-    request<{ pemeriksaan: PemeriksaanRecord | null }>(`/api/pengobatan/pemeriksaan/${idKun}`, { token }),
-  savePemeriksaan: (token: string, idKun: number, input: PemeriksaanInput) =>
-    request<{ pemeriksaan: PemeriksaanRecord | null }>(`/api/pengobatan/pemeriksaan/${idKun}`, { method: "PUT", body: input, token }),
+  // base: /api/pengobatan (Pengobatan form) or /api/pemeriksaan-perawat (Pemeriksaan Perawat), each guarded by its own menu.
+  getPemeriksaan: (token: string, idKun: number, base: PemeriksaanBase = "/api/pengobatan") =>
+    request<{ pemeriksaan: PemeriksaanRecord | null }>(`${base}/pemeriksaan/${idKun}`, { token }),
+  savePemeriksaan: (token: string, idKun: number, input: PemeriksaanInput, base: PemeriksaanBase = "/api/pengobatan") =>
+    request<{ pemeriksaan: PemeriksaanRecord | null }>(`${base}/pemeriksaan/${idKun}`, { method: "PUT", body: input, token }),
+  // MCU > Pendaftaran.
+  mcuDaftarOptions: (token: string) => request<McuDaftarOptions>("/api/mcu-pendaftaran/options", { token }),
+  mcuDaftarList: (token: string, params: McuDaftarQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: McuDaftarRow[]; total: number; unfilteredTotal: number }>(`/api/mcu-pendaftaran?${qs}`, { token });
+  },
+  mcuDaftarPasien: (token: string, params: { q?: string; page: number; size: number }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: McuDaftarPasien[]; total: number }>(`/api/mcu-pendaftaran/pasien?${qs}`, { token });
+  },
+  mcuDaftarLab: (token: string) => request<{ rows: McuDaftarLab[] }>("/api/mcu-pendaftaran/lab", { token }),
+  mcuDaftarPaket: (token: string) => request<{ rows: McuDaftarPaket[] }>("/api/mcu-pendaftaran/paket", { token }),
+  mcuDaftarNonLab: (token: string) => request<{ rows: McuDaftarNonLab[] }>("/api/mcu-pendaftaran/non-lab", { token }),
+  mcuDaftarDokter: (token: string) => request<{ rows: McuDaftarDokter[] }>("/api/mcu-pendaftaran/dokter", { token }),
+  mcuDaftarGet: (token: string, id: number) => request<McuDaftarDetail>(`/api/mcu-pendaftaran/${id}`, { token }),
+  mcuDaftarCreate: (token: string, input: McuDaftarInput) =>
+    request<{ ids: number[] }>("/api/mcu-pendaftaran", { method: "POST", body: input, token }),
+  mcuDaftarUpdate: (token: string, id: number, input: McuDaftarInput) =>
+    request<McuDaftarDetail>(`/api/mcu-pendaftaran/${id}`, { method: "PUT", body: input, token }),
+  mcuDaftarCancel: (token: string, id: number, reason: string) =>
+    request<void>(`/api/mcu-pendaftaran/${id}/cancel`, { method: "POST", body: { reason }, token }),
+  // Transaksi Klinik > Pemeriksaan Perawat.
+  perawatOptions: (token: string) => request<PerawatOptions>("/api/pemeriksaan-perawat/options", { token }),
+  perawatList: (token: string, params: PerawatQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: PerawatRow[]; total: number; unfilteredTotal: number }>(`/api/pemeriksaan-perawat?${qs}`, { token });
+  },
+  perawatPendaftaran: (token: string, idKun: number) =>
+    request<{ pendaftaran: PengobatanPendaftaran; editable: boolean }>(`/api/pemeriksaan-perawat/pendaftaran/${idKun}`, { token }),
+  perawatDokter: (token: string, cabang: string) =>
+    request<{ rows: PengobatanDokter[] }>(`/api/pemeriksaan-perawat/dokter?cabang=${encodeURIComponent(cabang)}`, { token }),
+  // Transaksi Klinik > Pemeriksaan Dokter.
+  dokterPeriksaOptions: (token: string) => request<DokterPeriksaOptions>("/api/pemeriksaan-dokter/options", { token }),
+  dokterPeriksaList: (token: string, params: PerawatQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: PerawatRow[]; total: number; unfilteredTotal: number }>(`/api/pemeriksaan-dokter?${qs}`, { token });
+  },
+  dokterPeriksaPendaftaran: (token: string, idKun: number, base: PemeriksaanBase = "/api/pemeriksaan-dokter") =>
+    request<{ pendaftaran: PengobatanPendaftaran; editable: boolean }>(`${base}/pendaftaran/${idKun}`, { token }),
+  dokterPeriksaDokter: (token: string, cabang: string) =>
+    request<{ rows: PengobatanDokter[] }>(`/api/pemeriksaan-dokter/dokter?cabang=${encodeURIComponent(cabang)}`, { token }),
+  dokterPeriksaObat: (token: string, cabang: string) =>
+    request<{ rows: PengobatanObat[] }>(`/api/pemeriksaan-dokter/obat?cabang=${encodeURIComponent(cabang)}`, { token }),
+  dokterPeriksaIcd: (token: string, params: { q?: string; page: number; size: number; sort?: string; dir?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: PengobatanIcd[]; total: number; unfilteredTotal: number }>(`/api/pemeriksaan-dokter/icd?${qs}`, { token });
+  },
+  getResep: (token: string, idKun: number, base: PemeriksaanBase = "/api/pemeriksaan-dokter") => request<Resep>(`${base}/resep/${idKun}`, { token }),
+  // Transaksi Klinik > Proses Obat (view only).
+  prosesObatOptions: (token: string) => request<PerawatOptions>("/api/proses-obat/options", { token }),
+  prosesObatList: (token: string, params: PerawatQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: PerawatRow[]; total: number; unfilteredTotal: number }>(`/api/proses-obat?${qs}`, { token });
+  },
+  saveResep: (token: string, idKun: number, input: ResepInput) =>
+    request<Resep>(`/api/pemeriksaan-dokter/resep/${idKun}`, { method: "PUT", body: input, token }),
   savePengobatan: (token: string, input: PengobatanSaveInput) =>
     request<PengobatanSaveResult>("/api/pengobatan", { method: "POST", body: input, token }),
   kuitansi: (token: string, id: number) => request<Kuitansi>(`/api/pengobatan/kuitansi/${id}`, { token }),

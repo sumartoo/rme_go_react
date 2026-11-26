@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Save } from "lucide-react";
-import { api, ApiError, PemeriksaanInput, PemeriksaanRecord } from "../api";
+import { api, ApiError, PemeriksaanBase, PemeriksaanInput, PemeriksaanRecord } from "../api";
 import { useAuth } from "../auth/AuthContext";
 
 /**
@@ -92,6 +92,11 @@ export default function PemeriksaanTab({
   idKun,
   idDokter,
   onDirty,
+  base = "/api/pengobatan",
+  readOnly = false,
+  requireDokter = false,
+  onLoaded,
+  section = "all",
 }: {
   hidden: boolean;
   /** The picked registration (trxpendaftaran id); null when none is picked. */
@@ -100,6 +105,16 @@ export default function PemeriksaanTab({
   idDokter: number | null;
   /** Reports whether there is typing that is not saved yet. */
   onDirty?: (dirty: boolean) => void;
+  /** Which API loads and saves it (each is guarded by its own menu). */
+  base?: PemeriksaanBase;
+  /** The visit is closed or cancelled: show the examination without saving. */
+  readOnly?: boolean;
+  /** Refuse to save until a Dokter PJ is chosen. */
+  requireDokter?: boolean;
+  /** Called with the loaded or saved examination (null when none is saved yet). */
+  onLoaded?: (r: PemeriksaanRecord | null) => void;
+  /** Which fields show: the nurse's (complaints and vital signs), the doctor's, or all. Save always sends all of them. */
+  section?: "all" | "perawat" | "dokter";
 }) {
   const { token, logout } = useAuth();
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -126,10 +141,11 @@ export default function PemeriksaanTab({
     let cancelled = false;
     setLoading(true);
     api
-      .getPemeriksaan(token, idKun)
+      .getPemeriksaan(token, idKun, base)
       .then((res) => {
         if (cancelled) return;
         setSaved(res.pemeriksaan);
+        onLoaded?.(res.pemeriksaan);
         if (res.pemeriksaan) setDraft(toDraft(res.pemeriksaan));
         else setMsg({ kind: "info", text: "Belum ada pemeriksaan untuk pendaftaran ini." });
       })
@@ -147,7 +163,11 @@ export default function PemeriksaanTab({
   const set = (k: keyof Draft) => (e: { target: { value: string } }) => setDraft({ ...draft, [k]: e.target.value });
 
   async function save() {
-    if (!token || idKun === null) return;
+    if (!token || idKun === null || readOnly) return;
+    if (requireDokter && idDokter === null) {
+      setMsg({ kind: "error", text: "Pilih Dokter PJ dulu." });
+      return;
+    }
     const nums: Partial<Record<NumKey, number | null>> = {};
     const errs: Record<string, string> = {};
     for (const [k, whole] of [
@@ -185,8 +205,9 @@ export default function PemeriksaanTab({
     setBusy(true);
     setFieldErrors({});
     try {
-      const res = await api.savePemeriksaan(token, idKun, input);
+      const res = await api.savePemeriksaan(token, idKun, input, base);
       setSaved(res.pemeriksaan);
+      onLoaded?.(res.pemeriksaan);
       if (res.pemeriksaan) setDraft(toDraft(res.pemeriksaan));
       setMsg({ kind: "success", text: `Pemeriksaan pendaftaran ${idKun} tersimpan.` });
     } catch (err) {
@@ -203,7 +224,7 @@ export default function PemeriksaanTab({
   }
 
   const err = (k: string) => fieldErrors[k] && <span className="field-error">{fieldErrors[k]}</span>;
-  const disabled = idKun === null || loading || busy;
+  const disabled = idKun === null || loading || busy || readOnly;
   const numInput = (k: NumKey, label: string, step: string) => (
     <input
       id={`tx-${k}`}
@@ -241,12 +262,14 @@ export default function PemeriksaanTab({
           {msg.text}
         </p>
       )}
-      {TEXTS.slice(0, 2).map((t) => (
+      {section !== "dokter" && TEXTS.slice(0, 2).map((t) => (
         <ExamRow key={t.key} id={`tx-${t.key}`} label={t.label}>
           <textarea id={`tx-${t.key}`} rows={2} maxLength={t.max} value={draft[t.key]} onChange={set(t.key)} disabled={disabled} />
           {err(t.key)}
         </ExamRow>
       ))}
+      {section !== "dokter" && (
+      <>
       <ExamRow id="tx-sistole" label="Tekanan Darah">
         <div className="tx-vitals">
           {numInput("sistole", "Sistole", "1")}
@@ -274,7 +297,9 @@ export default function PemeriksaanTab({
         </div>
         {err("suhu")}
       </ExamRow>
-      {TEXTS.slice(2).map((t) => (
+      </>
+      )}
+      {section !== "perawat" && TEXTS.slice(2).map((t) => (
         <ExamRow key={t.key} id={`tx-${t.key}`} label={t.label}>
           <textarea id={`tx-${t.key}`} rows={2} maxLength={t.max} value={draft[t.key]} onChange={set(t.key)} disabled={disabled} />
           {err(t.key)}

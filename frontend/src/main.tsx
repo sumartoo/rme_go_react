@@ -17,6 +17,9 @@ import PasienPage from "./pages/PasienPage";
 import PendaftaranPage from "./pages/PendaftaranPage";
 import PengobatanPage from "./pages/PengobatanPage";
 import PengobatanFormPage from "./pages/PengobatanFormPage";
+import PemeriksaanPerawatPage from "./pages/PemeriksaanPerawatPage";
+import PemeriksaanPerawatFormPage from "./pages/PemeriksaanPerawatFormPage";
+import PemeriksaanDokterFormPage from "./pages/PemeriksaanDokterFormPage";
 import PenjualanObatPage from "./pages/PenjualanObatPage";
 import PenjualanTindakanPage from "./pages/PenjualanTindakanPage";
 import PenjualanPenunjangPage from "./pages/PenjualanPenunjangPage";
@@ -31,6 +34,8 @@ import StokAlertPage from "./pages/StokAlertPage";
 import AnalitikPage from "./pages/AnalitikPage";
 import RiwayatPasienPage from "./pages/RiwayatPasienPage";
 import McuFormPage from "./pages/mcu/McuFormPage";
+import McuPendaftaranPage from "./pages/mcu/McuPendaftaranPage";
+import McuPendaftaranFormPage from "./pages/mcu/McuPendaftaranFormPage";
 import StokTracePage from "./pages/StokTracePage";
 import RujukanPage from "./pages/RujukanPage";
 import ReportPendaftaranPage from "./pages/ReportPendaftaranPage";
@@ -125,6 +130,9 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/master-data-klinik/distributor" element={<MenuGuard><DistributorPage /></MenuGuard>} />
             <Route path="/master-data-klinik/principal" element={<MenuGuard><PrincipalPage /></MenuGuard>} />
             <Route path="/master-data-klinik/icd" element={<MenuGuard><IcdPage /></MenuGuard>} />
+            <Route path="/mcu/pendaftaran" element={<MenuGuard><McuPendaftaranPage /></MenuGuard>} />
+            <Route path="/mcu/pendaftaran/new" element={<MenuGuard><McuPendaftaranFormPage key="new" /></MenuGuard>} />
+            <Route path="/mcu/pendaftaran/edit/:id" element={<MenuGuard><McuPendaftaranFormPage key="edit" /></MenuGuard>} />
             <Route path="/master-data/mcu" element={<MenuGuard><MasterMcuPage /></MenuGuard>} />
             <Route path="/master-data/perusahaan" element={<MenuGuard><PerusahaanPage /></MenuGuard>} />
             <Route path="/master-data/pasien" element={<MenuGuard><PasienMcuPage /></MenuGuard>} />
@@ -146,6 +154,12 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/transaksi-klinik/pengobatan" element={<MenuGuard><PengobatanPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan/new" element={<MenuGuard><PengobatanFormPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan/edit/:id" element={<MenuGuard><PengobatanFormPage /></MenuGuard>} />
+            <Route path="/transaksi-klinik/pemeriksaan-perawat" element={<MenuGuard><PemeriksaanPerawatPage key="perawat" /></MenuGuard>} />
+            <Route path="/transaksi-klinik/pemeriksaan-perawat/edit/:id" element={<MenuGuard><PemeriksaanPerawatFormPage /></MenuGuard>} />
+            <Route path="/transaksi-klinik/pemeriksaan-dokter" element={<MenuGuard><PemeriksaanPerawatPage key="dokter" dokter /></MenuGuard>} />
+            <Route path="/transaksi-klinik/pemeriksaan-dokter/edit/:id" element={<MenuGuard><PemeriksaanDokterFormPage /></MenuGuard>} />
+            <Route path="/transaksi-klinik/proses-obat" element={<MenuGuard><PemeriksaanPerawatPage key="proses-obat" prosesObat /></MenuGuard>} />
+            <Route path="/transaksi-klinik/proses-obat/view/:id" element={<MenuGuard><PemeriksaanDokterFormPage key="view" view /></MenuGuard>} />
             <Route path="/transaksi-klinik/penerimaan-barang" element={<MenuGuard><PenerimaanBarangPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/penerimaan-barang/new" element={<MenuGuard><PenerimaanBarangFormPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/penerimaan-barang/view/:id" element={<MenuGuard><PenerimaanBarangFormPage /></MenuGuard>} />

@@ -13,7 +13,10 @@ export default function DiagnosaLookup({
   chosen,
   onPick,
   onClose,
+  load = api.pengobatanIcd,
 }: {
+  /** Where the codes come from; Pemeriksaan Dokter uses its own endpoint. */
+  load?: typeof api.pengobatanIcd;
   /** Codes already in the list; picking one again is refused. */
   chosen: Set<number>;
   onPick: (d: PengobatanIcd) => void;
@@ -31,8 +34,7 @@ export default function DiagnosaLookup({
       if (!token) return;
       const mine = ++seq.current;
       setLoading(true);
-      api
-        .pengobatanIcd(token, { q: q.search, page: q.page, size: q.pageSize, sort: q.sort?.key, dir: q.sort?.dir })
+      load(token, { q: q.search, page: q.page, size: q.pageSize, sort: q.sort?.key, dir: q.sort?.dir })
         .then((res) => mine === seq.current && setPage(res))
         .catch((err) => {
           if (mine !== seq.current) return;

@@ -14,11 +14,14 @@ export default function DokterLookup({
   branchName,
   onPick,
   onClose,
+  load = api.pengobatanDokter,
 }: {
   cabang: string;
   branchName: string;
   onPick: (d: PengobatanDokter) => void;
   onClose: () => void;
+  /** Where the doctors come from; Pemeriksaan Perawat uses its own endpoint. */
+  load?: (token: string, cabang: string) => Promise<{ rows: PengobatanDokter[] }>;
 }) {
   const { token, logout } = useAuth();
   const dialogRef = useModal();
@@ -27,8 +30,7 @@ export default function DokterLookup({
 
   useEffect(() => {
     if (!token) return;
-    api
-      .pengobatanDokter(token, cabang)
+    load(token, cabang)
       .then((res) => setRows(res.rows))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) logout("Your session has expired. Please log in again.");

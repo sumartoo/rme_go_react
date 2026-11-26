@@ -45,7 +45,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 /** Card with a coloured header that can be collapsed, like the legacy panels. */
-function Card({ title, children, className, locked = false }: { title: string; children: ReactNode; className?: string; locked?: boolean }) {
+export function Card({ title, children, className, locked = false }: { title: string; children: ReactNode; className?: string; locked?: boolean }) {
   const [open, setOpen] = useState(true);
   return (
     <section className={["tx-card", className].filter(Boolean).join(" ")}>
@@ -70,7 +70,7 @@ function Card({ title, children, className, locked = false }: { title: string; c
 }
 
 /** Label on the left, control(s) on the right. */
-function Row({ id, label, required, children }: { id?: string; label: string; required?: boolean; children: ReactNode }) {
+export function Row({ id, label, required, children }: { id?: string; label: string; required?: boolean; children: ReactNode }) {
   return (
     <div className="tx-row">
       <label htmlFor={id}>
@@ -83,7 +83,7 @@ function Row({ id, label, required, children }: { id?: string; label: string; re
 }
 
 /** Read-only input with a search button that opens a lookup. */
-function Lookup({ id, placeholder, value = "", onSearch }: { id: string; placeholder: string; value?: string; onSearch: () => void }) {
+export function Lookup({ id, placeholder, value = "", onSearch }: { id: string; placeholder: string; value?: string; onSearch: () => void }) {
   return (
     <div className="tx-lookup">
       <input id={id} readOnly placeholder={placeholder} value={value} />

@@ -130,6 +130,11 @@ type Repository interface {
 	RegBranch(ctx context.Context, idKun int) (cabang string, status int, err error)
 	GetPemeriksaan(ctx context.Context, idKun int) (*PemeriksaanRecord, error)
 	SavePemeriksaan(ctx context.Context, idKun int, in Pemeriksaan, user string) error
+	PerawatList(ctx context.Context, p PerawatParams) (PerawatPage, error)
+	RegByID(ctx context.Context, idKun int) (RegRow, error)
+	DokterAtBranches(ctx context.Context, branches []string) ([]Dokter, error)
+	GetResep(ctx context.Context, idKun int) (Resep, error)
+	SaveResep(ctx context.Context, idKun int, in ResepInput) error
 	Save(ctx context.Context, in SaveInput, user string) (SaveResult, error)
 	Kuitansi(ctx context.Context, id int) (Kuitansi, error)
 	Cetak(ctx context.Context, id int, user string) (Kuitansi, error)

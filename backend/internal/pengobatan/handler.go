@@ -57,6 +57,39 @@ func (h *Handler) Routes(mux *http.ServeMux, requireAuth func(http.Handler) http
 	mux.Handle("GET /api/pengobatan/icd", guard(h.ICD))
 	mux.Handle("GET /api/pengobatan/pemeriksaan/{idKun}", guard(h.GetPemeriksaan))
 	mux.Handle("PUT /api/pengobatan/pemeriksaan/{idKun}", guard(h.SavePemeriksaan))
+
+	// Transaksi Klinik > Pemeriksaan Perawat: the same examination and Dokter PJ
+	// lookup, for roles that may open that page without the Pengobatan menu.
+	perawat := func(f http.HandlerFunc) http.Handler { return requireAuth(requireMenu(PerawatPath)(f)) }
+	mux.Handle("GET /api/pemeriksaan-perawat", perawat(h.PerawatList))
+	mux.Handle("GET /api/pemeriksaan-perawat/options", perawat(h.PerawatOptions))
+	mux.Handle("GET /api/pemeriksaan-perawat/dokter", perawat(h.Dokter))
+	mux.Handle("GET /api/pemeriksaan-perawat/pendaftaran/{idKun}", perawat(h.PerawatReg))
+	mux.Handle("GET /api/pemeriksaan-perawat/pemeriksaan/{idKun}", perawat(h.GetPemeriksaan))
+	mux.Handle("PUT /api/pemeriksaan-perawat/pemeriksaan/{idKun}", perawat(h.SavePemeriksaan))
+
+	// Transaksi Klinik > Pemeriksaan Dokter: the examination (a closed visit can
+	// still change), the doctor's prescription and diagnoses, and their lookups.
+	dokter := func(f http.HandlerFunc) http.Handler { return requireAuth(requireMenu(DokterPath)(f)) }
+	mux.Handle("GET /api/pemeriksaan-dokter", dokter(h.PerawatList))
+	mux.Handle("GET /api/pemeriksaan-dokter/options", dokter(h.DokterOptions))
+	mux.Handle("GET /api/pemeriksaan-dokter/dokter", dokter(h.Dokter))
+	mux.Handle("GET /api/pemeriksaan-dokter/obat", dokter(h.Obat))
+	mux.Handle("GET /api/pemeriksaan-dokter/icd", dokter(h.ICD))
+	mux.Handle("GET /api/pemeriksaan-dokter/pendaftaran/{idKun}", dokter(h.DokterReg))
+	mux.Handle("GET /api/pemeriksaan-dokter/pemeriksaan/{idKun}", dokter(h.GetPemeriksaan))
+	mux.Handle("PUT /api/pemeriksaan-dokter/pemeriksaan/{idKun}", dokter(h.SavePemeriksaanDokter))
+	mux.Handle("GET /api/pemeriksaan-dokter/resep/{idKun}", dokter(h.GetResep))
+	mux.Handle("PUT /api/pemeriksaan-dokter/resep/{idKun}", dokter(h.SaveResep))
+
+	// Transaksi Klinik > Proses Obat: the same list, and a read-only view of the
+	// examination, prescription and diagnoses.
+	proses := func(f http.HandlerFunc) http.Handler { return requireAuth(requireMenu(ProsesObatPath)(f)) }
+	mux.Handle("GET /api/proses-obat", proses(h.PerawatList))
+	mux.Handle("GET /api/proses-obat/options", proses(h.PerawatOptions))
+	mux.Handle("GET /api/proses-obat/pendaftaran/{idKun}", proses(h.ProsesObatReg))
+	mux.Handle("GET /api/proses-obat/pemeriksaan/{idKun}", proses(h.GetPemeriksaan))
+	mux.Handle("GET /api/proses-obat/resep/{idKun}", proses(h.GetResep))
 }
 
 func (h *Handler) branches(r *http.Request) ([]branchauth.Branch, error) {
@@ -396,6 +429,16 @@ func (h *Handler) GetPemeriksaan(w http.ResponseWriter, r *http.Request) {
 // caller's branches (trxpemeriksaan). Only while the visit is DAFTAR, PROSES or
 // PAYMENT; a closed or cancelled visit answers 409.
 func (h *Handler) SavePemeriksaan(w http.ResponseWriter, r *http.Request) {
+	h.savePemeriksaanWith(w, r, examEditable)
+}
+
+// SavePemeriksaanDokter is SavePemeriksaan for Pemeriksaan Dokter, where a
+// closed visit can still change (not a cancelled one).
+func (h *Handler) SavePemeriksaanDokter(w http.ResponseWriter, r *http.Request) {
+	h.savePemeriksaanWith(w, r, dokterEditable)
+}
+
+func (h *Handler) savePemeriksaanWith(w http.ResponseWriter, r *http.Request, editable func(status int) bool) {
 	idKun, status, ok := h.regOfCaller(w, r)
 	if !ok {
 		return
@@ -408,7 +451,7 @@ func (h *Handler) SavePemeriksaan(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, errs)
 		return
 	}
-	if !examEditable(status) {
+	if !editable(status) {
 		httpx.WriteError(w, http.StatusConflict, ErrRegNotEditable.Error())
 		return
 	}
