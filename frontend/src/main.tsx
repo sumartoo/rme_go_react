@@ -25,6 +25,13 @@ import PasienBaruPage from "./pages/PasienBaruPage";
 import RekapAsuransiPage from "./pages/RekapAsuransiPage";
 import TransaksiHarianPage from "./pages/TransaksiHarianPage";
 import AllStokPage from "./pages/AllStokPage";
+import StokOpnamePage from "./pages/StokOpnamePage";
+import StokAdjusmentPage from "./pages/StokAdjusmentPage";
+import StokAlertPage from "./pages/StokAlertPage";
+import AnalitikPage from "./pages/AnalitikPage";
+import RiwayatPasienPage from "./pages/RiwayatPasienPage";
+import McuFormPage from "./pages/mcu/McuFormPage";
+import StokTracePage from "./pages/StokTracePage";
 import RujukanPage from "./pages/RujukanPage";
 import ReportPendaftaranPage from "./pages/ReportPendaftaranPage";
 import ReportPendapatanPage from "./pages/ReportPendapatanPage";
@@ -45,6 +52,7 @@ import DokterMasterPage from "./pages/DokterMasterPage";
 import DokterMcuPage from "./pages/DokterMcuPage";
 import LabPricePage from "./pages/LabPricePage";
 import PaketPricePage from "./pages/PaketPricePage";
+import SettingBarcodePage from "./pages/SettingBarcodePage";
 import PrincipalPage from "./pages/PrincipalPage";
 import PenunjangPage from "./pages/PenunjangPage";
 import MenuPage from "./pages/MenuPage";
@@ -73,6 +81,25 @@ window.addEventListener("vite:preloadError", (event) => {
   }
   window.location.reload();
 });
+
+const MCU_ROUTES: [string, string][] = [
+  ["/mcu/pemeriksaan-fisik", "fisik"],
+  ["/mcu/riwayat-medis", "riwayat-medis"],
+  ["/mcu/pemeriksaan-lab", "lab"],
+  ["/mcu/pemeriksaan-audiometri", "audiometri"],
+  ["/mcu/riwayat-kesehatan-keluarga", "riwayat-keluarga"],
+  ["/mcu/riwayat-khusus-wanita", "khusus-wanita"],
+  ["/mcu/riwayat-opname-operasi", "opname-operasi"],
+  ["/mcu/kebiasaan-pasien", "kebiasaan"],
+  ["/mcu/riwayat-pekerjaan", "pekerjaan"],
+  ["/mcu/anamnesa", "anamnesa"],
+  ["/mcu/pemeriksaan-gigi", "gigi"],
+  ["/mcu/rontgen-thorax", "rontgen"],
+  ["/mcu/ekg", "ekg"],
+  ["/mcu/ekg-treadmill", "treadmill"],
+  ["/mcu/spirometry", "spirometri"],
+  ["/mcu/usg", "usg"],
+];
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -109,8 +136,13 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/master-data/dokter" element={<MenuGuard><DokterMcuPage /></MenuGuard>} />
             <Route path="/setting/price" element={<MenuGuard><LabPricePage /></MenuGuard>} />
             <Route path="/setting/paket-price" element={<MenuGuard><PaketPricePage /></MenuGuard>} />
+            <Route path="/setting/barcode" element={<MenuGuard><SettingBarcodePage /></MenuGuard>} />
             <Route path="/master-data-klinik/penjual-otc" element={<MenuGuard><PerujukOtcPage /></MenuGuard>} />
             <Route path="/front-office-klinik/pendaftaran-pasien" element={<MenuGuard><PendaftaranPage /></MenuGuard>} />
+            <Route path="/front-office-klinik/riwayat-pasien" element={<MenuGuard><RiwayatPasienPage /></MenuGuard>} />
+            {MCU_ROUTES.map(([path, form]) => (
+              <Route key={path} path={path} element={<MenuGuard><McuFormPage key={form} form={form} /></MenuGuard>} />
+            ))}
             <Route path="/transaksi-klinik/pengobatan" element={<MenuGuard><PengobatanPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan/new" element={<MenuGuard><PengobatanFormPage /></MenuGuard>} />
             <Route path="/transaksi-klinik/pengobatan/edit/:id" element={<MenuGuard><PengobatanFormPage /></MenuGuard>} />
@@ -127,6 +159,11 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/report-klinik/rekap-asuransi" element={<MenuGuard><RekapAsuransiPage /></MenuGuard>} />
             <Route path="/report-klinik/transaksi-harian" element={<MenuGuard><TransaksiHarianPage /></MenuGuard>} />
             <Route path="/report-klinik/all-stok" element={<MenuGuard><AllStokPage /></MenuGuard>} />
+            <Route path="/stok-farmasi/stok-opname" element={<MenuGuard><StokOpnamePage /></MenuGuard>} />
+            <Route path="/stok-farmasi/stok-adjusment" element={<MenuGuard><StokAdjusmentPage /></MenuGuard>} />
+            <Route path="/stok-farmasi/stok-alert" element={<MenuGuard><StokAlertPage /></MenuGuard>} />
+            <Route path="/stok-farmasi/analitik" element={<MenuGuard><AnalitikPage /></MenuGuard>} />
+            <Route path="/stok-farmasi/stok-trace" element={<MenuGuard><StokTracePage /></MenuGuard>} />
             <Route path="/report-klinik/rujukan" element={<MenuGuard><RujukanPage /></MenuGuard>} />
             <Route path="/report-klinik/pendaftaran" element={<MenuGuard><ReportPendaftaranPage /></MenuGuard>} />
             <Route path="/report-klinik/report-pendapatan" element={<MenuGuard><ReportPendapatanPage /></MenuGuard>} />

@@ -15,6 +15,11 @@ services:
       JWT_TTL: ${JWT_TTL:-15m}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
+      # Stok Farmasi > Analitik AI assistant; empty key = assistant off
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120s}
     # Same check as the Dockerfile, plus a grace period for the database retries
     # and migrations at startup (a fresh database runs all of them).
     healthcheck:

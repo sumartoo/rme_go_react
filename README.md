@@ -441,6 +441,15 @@ LAB_PASSWORD=... scripts/import-lab-lab-master.sh            # migration 043_lab
 LAB_PASSWORD=... scripts/import-lab-lab-master.sh --replace
 ```
 
+## Setting › Barcode
+
+`/setting/barcode` shows the MCU barcode label layout (`refsettingbarcode`, one row in lab): ID, Left, Middle, Right, Width and Height (`barcodewidth`/`barcodeheight`); Barcode Left/Top and Font Size are under Column visibility. The pencil edits every number of the row, grouped as Margin (left, middle, right), Posisi baris (row1–row6) and Barcode (width, height, left, top, font size), each from 0 to 10000 or empty, plus Status (`isactive`). There is no Add or delete, like the original screen.
+
+```bash
+LAB_PASSWORD=... scripts/import-lab-setting-barcode.sh            # migration 050_setting_barcode.sql creates the table
+LAB_PASSWORD=... scripts/import-lab-setting-barcode.sh --replace
+```
+
 ## Setting › Paket Price
 
 `/setting/paket-price` lists the MCU packages per company (`refpriceheader`, 364 rows): ID, Perusahaan (`refcompany`, inner join like the original query), Nama Paket, Paket (Ya/Tidak), Kategori (`refcategory`), Price (`94.000,00`) and Status (`isactive`: Aktif/Non Aktif), newest first. Dari/Sampai and Jumlah Lab are under Column visibility. Each row has:
@@ -1071,6 +1080,7 @@ backend/
   internal/principal          drug principals (/api/principal)
   internal/icd                ICD-X codes with server-side paging (/api/icd)
   internal/lab                lab examinations, Master Data > Lab (/api/lab)
+  internal/settingbarcode     barcode label layout, Setting > Barcode (/api/setting-barcode)
   internal/paketprice         MCU packages, Setting > Paket Price (/api/paket-price)
   internal/labprice           lab examination prices, Setting > Price (/api/lab-price)
   internal/labmaster          lab examination groups, Master Data > Lab Master (/api/lab-master)
@@ -1096,7 +1106,7 @@ frontend/
   src/components/FormKit      modal form, fields and amount inputs for master-data dialogs
   src/components/barcode.ts   Code 128 barcode (SVG) for patient cards
   src/components/dates.ts     today, addDays, DD/MM/YYYY formatting and age
-  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, MasterMcuPage, PerusahaanPage, PasienMcuPage, LabMasterPage, LabSubMasterPage, LabPage, NonLabPage, DokterMasterPage, DokterMcuPage, LabPricePage, PaketPricePage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
+  src/pages/                  Register, Login, Dashboard, RolePage, UserPage, BranchPage, ObatPage, TindakanPage, PenunjangPage, PasienPage, DokterPage, JamkesPage, DistributorPage, PrincipalPage, IcdPage, PerujukOtcPage, MasterMcuPage, PerusahaanPage, PasienMcuPage, LabMasterPage, LabSubMasterPage, LabPage, NonLabPage, DokterMasterPage, DokterMcuPage, LabPricePage, PaketPricePage, SettingBarcodePage, PendaftaranPage, PengobatanPage, PengobatanFormPage (+ PendaftaranLookup, DokterLookup, ObatLookup, TindakanLookup, DiagnosaLookup, PemeriksaanTab, pengobatanCalc), MenuPage (placeholder)
 scripts/import-lab-obat.sh    copies drugs and stock from the legacy lab database
 scripts/import-lab-tindakan.sh copies procedures and prices per branch from lab
 scripts/import-lab-penunjang.sh copies supporting examinations and prices per branch from lab

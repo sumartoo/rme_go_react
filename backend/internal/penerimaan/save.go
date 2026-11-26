@@ -14,6 +14,7 @@ import (
 
 	"github.com/example/be_jwt_golang/backend/internal/httpx"
 	"github.com/example/be_jwt_golang/backend/internal/pendaftaran"
+	"github.com/example/be_jwt_golang/backend/internal/stoklog"
 )
 
 // Saving a goods receipt (the Add form's Save) follows the legacy data:
@@ -233,12 +234,13 @@ func (p *PostgresRepository) Save(ctx context.Context, in SaveInput, user string
 		return res, err
 	}
 	for i, l := range in.Obat {
-		if _, err := tx.Exec(ctx, `INSERT INTO trxfakturobat (id_fak, id_obat, no_batch, tgl_exp, disc, hbeli, byk, tot_qjb)
-			VALUES ($1, $2, $3, $4::date, $5, $6, $7, $7)`, res.ID, l.IDObat, l.NoBatch, l.TglExp, l.Disc, prices[i], l.Byk); err != nil {
+		var idLine int
+		if err := tx.QueryRow(ctx, `INSERT INTO trxfakturobat (id_fak, id_obat, no_batch, tgl_exp, disc, hbeli, byk, tot_qjb)
+			VALUES ($1, $2, $3, $4::date, $5, $6, $7, $7) RETURNING id`, res.ID, l.IDObat, l.NoBatch, l.TglExp, l.Disc, prices[i], l.Byk).Scan(&idLine); err != nil {
 			return res, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE trxstock SET stok = COALESCE(stok, 0) + $1 WHERE id_obat = $2 AND cabang = $3`,
-			l.Byk, l.IDObat, in.Cabang); err != nil {
+		if _, _, err := stoklog.Move(ctx, tx, stoklog.Entry{IDObat: l.IDObat, Cabang: in.Cabang, Delta: l.Byk,
+			TableRef: stoklog.RefFaktur, IDRef: idLine, Remarks: "Good Receive " + in.Cabang, User: user}); err != nil {
 			return res, err
 		}
 	}

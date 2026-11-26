@@ -17,7 +17,7 @@ REPLACE=0
 require_empty refobat "$REPLACE"
 
 echo "Clearing app drug tables..."
-app -c "TRUNCATE trxstock, refobat, refjenisobat, refsatuan, reflogoobat, refprodusen, refkodemovingobat,
+app -c "TRUNCATE trxobat, trxstokadjus, trxstock, refobat, refjenisobat, refsatuan, reflogoobat, refprodusen, refkodemovingobat,
         refkodemovingpo, refdistributorobat, refprincipalobat, refgolonganobat RESTART IDENTITY"
 
 echo "Copying from $LAB_USER@$LAB_HOST:$LAB_PORT/$LAB_DB ..."

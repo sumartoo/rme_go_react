@@ -127,6 +127,9 @@ type Repository interface {
 	DokterCabang(ctx context.Context, cabang string) ([]Option, error)
 	ReportDiagnosa(ctx context.Context, p DiagnosaParams) (DiagnosaPage, error)
 	ReportDinkes(ctx context.Context, p DinkesParams) (DinkesPage, error)
+	StokOpname(ctx context.Context, p OpnameParams) (OpnamePage, error)
+	ObatCabang(ctx context.Context, branch string) ([]ObatCabang, error)
+	StokTrace(ctx context.Context, p TraceParams) (TracePage, error)
 }
 
 type PostgresRepository struct {

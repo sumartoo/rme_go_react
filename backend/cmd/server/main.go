@@ -12,9 +12,11 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/example/be_jwt_golang/backend/internal/analitik"
 	"github.com/example/be_jwt_golang/backend/internal/auth"
 	"github.com/example/be_jwt_golang/backend/internal/branch"
 	"github.com/example/be_jwt_golang/backend/internal/branchauth"
+	"github.com/example/be_jwt_golang/backend/internal/complaint"
 	"github.com/example/be_jwt_golang/backend/internal/config"
 	"github.com/example/be_jwt_golang/backend/internal/db"
 	"github.com/example/be_jwt_golang/backend/internal/distributor"
@@ -29,6 +31,7 @@ import (
 	"github.com/example/be_jwt_golang/backend/internal/labprice"
 	"github.com/example/be_jwt_golang/backend/internal/labsubmaster"
 	"github.com/example/be_jwt_golang/backend/internal/mastermcu"
+	"github.com/example/be_jwt_golang/backend/internal/mcuhasil"
 	"github.com/example/be_jwt_golang/backend/internal/menu"
 	"github.com/example/be_jwt_golang/backend/internal/nonlab"
 	"github.com/example/be_jwt_golang/backend/internal/obat"
@@ -44,7 +47,10 @@ import (
 	"github.com/example/be_jwt_golang/backend/internal/perusahaan"
 	"github.com/example/be_jwt_golang/backend/internal/principal"
 	"github.com/example/be_jwt_golang/backend/internal/reportklinik"
+	"github.com/example/be_jwt_golang/backend/internal/riwayatpasien"
 	"github.com/example/be_jwt_golang/backend/internal/role"
+	"github.com/example/be_jwt_golang/backend/internal/settingbarcode"
+	"github.com/example/be_jwt_golang/backend/internal/stokadjus"
 	"github.com/example/be_jwt_golang/backend/internal/tindakan"
 	"github.com/example/be_jwt_golang/backend/internal/user"
 )
@@ -98,6 +104,7 @@ func main() {
 	principal.NewHandler(principal.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	icd.NewHandler(icd.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	lab.NewHandler(lab.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	settingbarcode.NewHandler(settingbarcode.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	paketprice.NewHandler(paketprice.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	labprice.NewHandler(labprice.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	labmaster.NewHandler(labmaster.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
@@ -114,6 +121,34 @@ func main() {
 	pengobatan.NewHandler(pengobatan.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	reportklinik.NewHandler(reportklinik.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
 	penerimaan.NewHandler(penerimaan.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	stokadjus.NewHandler(stokadjus.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	// Stok Farmasi > Analitik: forecasts in Go; the DeepSeek assistant only when DEEPSEEK_API_KEY is set.
+	var assistant analitik.Assistant
+	if cfg.DeepSeekAPIKey != "" {
+		assistant = analitik.NewDeepSeek(cfg.DeepSeekAPIKey, cfg.DeepSeekBaseURL, cfg.AIModel, cfg.AITimeout)
+	} else {
+		log.Printf("DEEPSEEK_API_KEY is not set: Analitik works without the AI assistant")
+	}
+	analitik.NewHandler(analitik.NewPostgresRepository(pool), assistant).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	riwayatpasien.NewHandler(riwayatpasien.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	mcuhasil.NewHandler(mcuhasil.NewPostgresRepository(pool)).Routes(mux, tokens.Middleware, menuHandler.RequireMenu)
+	// Part 2: complaints analysed by AI through n8n (JWT for the app, shared secret for n8n's callback).
+	complaintRepo := complaint.NewPostgresRepository(pool)
+	callbackURL := ""
+	if cfg.PublicBaseURL != "" {
+		callbackURL = cfg.PublicBaseURL + "/api/n8n/complaints/callback"
+	}
+	complaintQueue := complaint.NewDispatcher(ctx, complaintRepo, complaint.DispatcherConfig{
+		WebhookURL:  cfg.N8NWebhookURL,
+		Secret:      cfg.N8NWebhookSecret,
+		Timeout:     cfg.N8NTimeout,
+		MaxAttempts: cfg.N8NMaxRetries,
+		CallbackURL: callbackURL,
+	})
+	complaint.NewHandler(complaintRepo, complaintQueue, cfg.N8NWebhookSecret).Routes(mux, tokens.Middleware)
+	if cfg.N8NWebhookURL == "" {
+		log.Printf("N8N_WEBHOOK_URL is not set: complaints are saved but not analysed")
+	}
 	if cfg.SwaggerEnabled {
 		docs.Register(mux)
 		log.Printf("swagger UI enabled at /swagger/")
@@ -136,6 +171,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+	complaintQueue.Wait()
 	log.Println("server stopped")
 }
 

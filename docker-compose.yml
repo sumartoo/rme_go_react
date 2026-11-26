@@ -26,6 +26,15 @@ services:
       JWT_TTL: ${JWT_TTL:-15m}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      N8N_TIMEOUT: ${N8N_TIMEOUT:-30s}
+      N8N_MAX_RETRIES: ${N8N_MAX_RETRIES:-3}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      AI_TIMEOUT: ${AI_TIMEOUT:-120s}
     depends_on:
       db:
         condition: service_healthy

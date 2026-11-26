@@ -33,6 +33,12 @@ tags:
     description: Transaksi Klinik pages; limited to the caller's branches.
   - name: report-klinik
     description: Report Klinik pages; limited to the caller's branches.
+  - name: stok-farmasi
+    description: Stok Farmasi pages; limited to the caller's branches.
+  - name: complaint
+    description: |
+      Customer complaints analysed by AI through n8n (Part 2). App endpoints need a JWT;
+      the n8n callback needs the X-Webhook-Secret header instead.
   - name: system
     description: Operational endpoints
 
@@ -2537,6 +2543,66 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/setting-barcode:
+    get:
+      tags: [setting]
+      summary: The MCU barcode label layout (refsettingbarcode)
+      description: Usually one row. Requires the Setting > Barcode menu.
+      operationId: listSettingBarcode
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Layout rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  setting:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SettingBarcode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/setting-barcode/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    put:
+      tags: [setting]
+      summary: Update the barcode label layout
+      operationId: updateSettingBarcode
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingBarcodeInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingBarcode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/paket-price:
     get:
       tags: [setting]
@@ -3575,6 +3641,311 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/complaints:
+    get:
+      tags: [complaint]
+      summary: List complaints with their AI analysis
+      description: Sorted by priority (urgent first), then newest. All filters are optional.
+      operationId: listComplaints
+      security:
+        - bearerAuth: []
+      parameters:
+        - {name: aiStatus, in: query, schema: {type: string, enum: [pending, processing, analyzed, failed]}}
+        - {name: handlingStatus, in: query, schema: {type: string, enum: [open, in_progress, resolved, closed]}}
+        - {name: sentiment, in: query, schema: {type: string, enum: [positive, neutral, negative]}}
+        - {name: priority, in: query, schema: {type: string, enum: [low, medium, high, urgent]}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: q, in: query, description: Text in customer name or message, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1, minimum: 1}}
+        - {name: pageSize, in: query, schema: {type: integer, default: 20, minimum: 1, maximum: 100}}
+      responses:
+        '200':
+          description: One page of complaints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  complaints:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Complaint'
+                  total: {type: integer}
+                  page: {type: integer}
+                  pageSize: {type: integer}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [complaint]
+      summary: Submit a smart-router request (ai complaint, erp or email)
+      description: |
+        **type ai** (default): saves the complaint as `pending` and sends `{title, subject, message, type: "ai"}`
+        to the n8n smart-router webhook in the background (header `X-Webhook-Secret`, retry with backoff).
+        The analysis from n8n's Respond to Webhook is validated and saved. Answers 202; poll
+        **GET /api/complaints/{id}** for the result.
+
+        **type erp / email**: not stored. Forwarded once to n8n (no retry, so nothing runs twice) and
+        n8n's answer is returned with 200, like **POST /api/n8n/requests**. `recipient` is required for email.
+      operationId: createComplaint
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplaintInput'
+            examples:
+              ai:
+                value: {title: AI Assistant, subject: Analyze Customer Complaint, type: ai, message: Pelanggan mengeluhkan keterlambatan pengiriman}
+              erp:
+                value: {title: ERP Transaction, subject: create_purchase_order, type: erp, message: Buat purchase order untuk supplier SUP001 dengan total Rp5.000.000}
+              email:
+                value: {title: Email, subject: send_notification, type: email, recipient: customer@example.com, message: Pesanan Anda sedang diproses dan akan segera dikirim.}
+      responses:
+        '200':
+          description: type erp or email, n8n's HTTP status and body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  n8nStatus: {type: integer}
+                  response: {description: n8n's body (JSON, or text)}
+        '202':
+          description: type ai, saved and analysis started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '502':
+          description: type erp or email, n8n unreachable or answered 5xx
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: type erp or email, N8N_WEBHOOK_URL is not set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/complaints/summary:
+    get:
+      tags: [complaint]
+      summary: Dashboard counts by category, sentiment, priority and status
+      operationId: complaintSummary
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Counts; complaints not analysed yet count as "unanalyzed"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplaintSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/complaints/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    get:
+      tags: [complaint]
+      summary: A complaint with its AI pipeline log
+      description: The log lists every call to n8n (HTTP status, duration, error), callbacks and rejected AI outputs.
+      operationId: getComplaint
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Complaint and log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplaintLog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/complaints/{id}/status:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    patch:
+      tags: [complaint]
+      summary: Update the handling status
+      operationId: setComplaintStatus
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handlingStatus]
+              properties:
+                handlingStatus: {type: string, enum: [open, in_progress, resolved, closed]}
+                note: {type: string, maxLength: 2000}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/complaints/{id}/retry:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+      - {name: force, in: query, description: Retry even while processing (the callback never came), schema: {type: boolean}}
+    post:
+      tags: [complaint]
+      summary: Send the complaint to n8n again
+      operationId: retryComplaint
+      security:
+        - bearerAuth: []
+      responses:
+        '202':
+          description: Queued
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Still processing; add ?force=true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/n8n/requests:
+    post:
+      tags: [complaint]
+      summary: Forward a smart-router request (ai, erp, email) to n8n
+      description: |
+        Sends the body as is to N8N_WEBHOOK_URL and returns n8n's answer. Nothing is stored.
+        Only type `ai` is retried; `erp` and `email` are sent once so a timeout cannot create
+        a purchase order or send an email twice.
+      operationId: forwardToN8n
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouterRequest'
+            examples:
+              email:
+                value: {title: Email, subject: send_notification, type: email, recipient: customer@example.com, message: Pesanan Anda sedang diproses dan akan segera dikirim.}
+              erp:
+                value: {title: ERP Transaction, subject: create_purchase_order, type: erp, message: Buat purchase order untuk supplier SUP001 dengan total Rp5.000.000}
+              ai:
+                value: {title: AI Assistant, subject: Analyze Customer Complaint, type: ai, message: Pelanggan mengeluhkan keterlambatan pengiriman}
+      responses:
+        '200':
+          description: n8n's HTTP status and body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  n8nStatus: {type: integer}
+                  response: {description: n8n's body (JSON, or text)}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          description: n8n unreachable or answered 5xx
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: N8N_WEBHOOK_URL is not set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/n8n/complaints/callback:
+    post:
+      tags: [complaint]
+      summary: n8n posts the AI analysis back (shared secret, no JWT)
+      description: |
+        Requires header `X-Webhook-Secret` = `N8N_WEBHOOK_SECRET` (click **Authorize** > webhookSecret).
+        The analysis is validated before it is saved: `sentiment` positive|neutral|negative,
+        `priority` low|medium|high|urgent, `category` 1-50 chars. It may also be a string holding
+        the JSON (```json fences are removed) or sit at the top level of the body.
+        Send `{"complaintId": 1, "error": "..."}` to report a failure inside n8n.
+      operationId: complaintCallback
+      security:
+        - webhookSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [complaintId]
+              properties:
+                complaintId: {type: integer, example: 1}
+                analysis:
+                  $ref: '#/components/schemas/ComplaintAnalysis'
+                error: {type: string}
+      responses:
+        '200':
+          description: Saved (or the reported error was recorded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Missing or wrong X-Webhook-Secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: AI output failed validation; the complaint is marked failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '503':
+          description: N8N_WEBHOOK_SECRET is not set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /healthz:
     get:
       tags: [system]
@@ -4466,6 +4837,379 @@ paths:
                   movingPo: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string } } } }
                   branches: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
                   today: { type: string, format: date }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-opname:
+    get:
+      tags: [stok-farmasi]
+      summary: Stok Opname, every drug at your branches with its stock, minimum stock and prices
+      description: >-
+        One row per stock row (trxstock: drug and branch) joined with the drug (refobat), its units
+        (refsatuan), type (refjenisobat) and branch (refbranch), by drug id. Prices are the branch's
+        (trxstock.hjual, hbeli); jumUnit is refobat.qjb.
+      operationId: stokOpname
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, description: One of your branches (403 otherwise), schema: { type: string } }
+        - { name: q, in: query, description: 'Drug, type, unit, branch or drug id', schema: { type: string } }
+        - { name: nama, in: query, description: Drug name (Filter panel), schema: { type: string } }
+        - { name: jenis, in: query, description: refjenisobat id (Filter panel), schema: { type: integer } }
+        - { name: aktif, in: query, description: '1 = sold at the branch (trxstock.isactive = 1), 0 = not', schema: { type: string, enum: ['1', '0'] } }
+        - { name: sort, in: query, schema: { type: string, enum: [idObat, nama, hargaJual, hargaBeli, beratIsi, jenis, satuanBeli, satuanJual, jumUnit, stokMin, stok, cabang], default: idObat } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 10 } }
+      responses:
+        '200':
+          description: One page of stock rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        idObat: { type: integer, description: Kode }
+                        nama: { type: string }
+                        hargaJual: { type: number }
+                        hargaBeli: { type: number }
+                        beratIsi: { type: string, description: refobat.isi (text) }
+                        idJenis: { type: integer, nullable: true }
+                        jenis: { type: string }
+                        satuanBeli: { type: string }
+                        satuanJual: { type: string }
+                        jumUnit: { type: number, description: refobat.qjb }
+                        stokMin: { type: number }
+                        stok: { type: number }
+                        cabang: { type: string }
+                        namaCabang: { type: string }
+                        kenaPajak: { type: boolean }
+                        isActive: { type: boolean }
+                  total: { type: integer }
+                  unfilteredTotal: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-alert/minim-stok:
+    get:
+      tags: [stok-farmasi]
+      summary: Stok Alert, Obat Minim Stok - the drugs at your branches whose stock is below the minimum
+      description: >-
+        The Stok Opname rows where trxstock.stok_min > stok, by drug name. Same parameters and
+        response as /api/stok-farmasi/stok-opname (default sort nama).
+      operationId: stokAlertMinimStok
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, description: One of your branches (403 otherwise), schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: nama, in: query, schema: { type: string } }
+        - { name: jenis, in: query, schema: { type: integer } }
+        - { name: sort, in: query, schema: { type: string, enum: [idObat, nama, hargaJual, hargaBeli, beratIsi, jenis, satuanBeli, satuanJual, jumUnit, stokMin, stok, cabang], default: nama } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 10 } }
+      responses:
+        '200':
+          description: One page of stock rows below the minimum (same shape as stok-opname)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  unfilteredTotal: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-alert/options:
+    get:
+      tags: [stok-farmasi]
+      summary: Drug types and your branches, for Stok Alert
+      operationId: stokAlertOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jenis: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string } } } }
+                  branches: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-trace:
+    get:
+      tags: [stok-farmasi]
+      summary: Stok Trace, the stock movements of a drug (or every drug) at one of your branches
+      description: >-
+        trxobat lines in the period, oldest first. Every change of trxstock.stok writes one: sales
+        (TrxJualObat, Out), goods receipts (TrxFakturObat, In), stock adjustments (TrxStokAdjus) and
+        cancelled sales (TrxStokAdjusCancel, In). transaksi names table_ref like the legacy page.
+      operationId: stokTrace
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, description: One of your branches (403 otherwise), schema: { type: string } }
+        - { name: obat, in: query, description: 'refobat id; empty or 0 = every drug', schema: { type: integer } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: q, in: query, description: 'Drug, keterangan, user, In/Out or transaksi', schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [id, createdDate, nama, lastStock, inOut, byk, stock, createdBy, transaksi, remarks, cabang], default: id } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 10 } }
+      responses:
+        '200':
+          description: One page of stock movements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        idObat: { type: integer }
+                        nama: { type: string }
+                        cabang: { type: string }
+                        namaCabang: { type: string }
+                        lastStock: { type: number, description: Stock Lama }
+                        inOut: { type: string, enum: [In, Out] }
+                        byk: { type: number }
+                        stock: { type: number }
+                        systemStock: { type: number }
+                        tableRef: { type: string, example: TrxJualObat }
+                        transaksi: { type: string, example: Penjualan Obat }
+                        remarks: { type: string }
+                        createdBy: { type: string }
+                        createdDate: { type: string, example: '2026-11-22 23:32:10.773' }
+                  total: { type: integer }
+                  unfilteredTotal: { type: integer }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-trace/obat:
+    get:
+      tags: [stok-farmasi]
+      summary: The drugs stocked at one of your branches, for Stok Trace's Obat lookup
+      operationId: stokTraceObat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Drugs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        nama: { type: string }
+                        jenis: { type: string }
+                        satuan: { type: string }
+                        stok: { type: number }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-opname/options:
+    get:
+      tags: [stok-farmasi]
+      summary: Drug types and your branches, for Stok Opname
+      operationId: stokOpnameOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jenis: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string } } } }
+                  branches: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-adjusment:
+    get:
+      tags: [stok-farmasi]
+      summary: Stok Adjusment, the stock corrections at your branches
+      description: >-
+        One row per adjustment (trxstokadjus) whose tanggal is in the period, newest first.
+        status 1 = Masuk (stock went up), 0 = Keluar (stock went down).
+      operationId: stokAdjusmentList
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: from, in: query, description: Default 29 days before to, schema: { type: string, format: date } }
+        - { name: to, in: query, description: Default today (clinic date), schema: { type: string, format: date } }
+        - { name: cabang, in: query, description: One of your branches (403 otherwise), schema: { type: string } }
+        - { name: q, in: query, description: 'Drug, keterangan, status, branch, id or drug id', schema: { type: string } }
+        - { name: nama, in: query, description: Drug name (Cari panel), schema: { type: string } }
+        - { name: ket, in: query, description: Keterangan (Cari panel), schema: { type: string } }
+        - { name: status, in: query, description: '1 = Masuk, 0 = Keluar (Cari panel)', schema: { type: string, enum: ['1', '0'] } }
+        - { name: sort, in: query, schema: { type: string, enum: [id, tanggal, idObat, nama, status, ket, byk, cabang], default: id } }
+        - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 5000, default: 10 } }
+      responses:
+        '200':
+          description: One page of adjustments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer, description: Kode }
+                        tanggal: { type: string, format: date, nullable: true }
+                        idObat: { type: integer }
+                        nama: { type: string }
+                        status: { type: integer, enum: [0, 1] }
+                        statusDesc: { type: string, enum: [Masuk, Keluar] }
+                        ket: { type: string }
+                        byk: { type: number }
+                        cabang: { type: string }
+                        namaCabang: { type: string }
+                  total: { type: integer }
+                  unfilteredTotal: { type: integer }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [stok-farmasi]
+      summary: Record a stock adjustment and move the branch stock
+      description: >-
+        Inserts a trxstokadjus row and, in the same transaction, adds byk to trxstock.stok (Masuk) or
+        takes it off (Keluar, 400 when the stock is smaller than byk). The drug must be stocked at the branch.
+      operationId: stokAdjusmentSave
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cabang, tanggal, idObat, status, byk, ket]
+              properties:
+                cabang: { type: string }
+                tanggal: { type: string, format: date, description: Not after today }
+                idObat: { type: integer }
+                status: { type: integer, enum: [0, 1], description: '1 = Masuk, 0 = Keluar' }
+                byk: { type: number, exclusiveMinimum: 0 }
+                ket: { type: string, maxLength: 60 }
+      responses:
+        '201':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  stok: { type: number, description: The branch stock after the adjustment }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-adjusment/options:
+    get:
+      tags: [stok-farmasi]
+      summary: Your branches, today's clinic date and the default period start, for Stok Adjusment
+      operationId: stokAdjusmentOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  branches: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
+                  today: { type: string, format: date }
+                  defaultFrom: { type: string, format: date }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/stok-farmasi/stok-adjusment/obat:
+    get:
+      tags: [stok-farmasi]
+      summary: The drugs stocked at one of your branches, for the Add form
+      operationId: stokAdjusmentObat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Drugs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        nama: { type: string }
+                        jenis: { type: string }
+                        satuan: { type: string }
+                        stok: { type: number }
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5622,12 +6366,726 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/analitik/options:
+    get:
+      tags: [stok-farmasi]
+      summary: Your branches, today's clinic date, the forecast defaults and whether the AI assistant is configured (Stok Farmasi > Analitik)
+      operationId: analitikOptions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  branches: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
+                  today: { type: string, format: date }
+                  aiEnabled: { type: boolean, description: false when DEEPSEEK_API_KEY is not set }
+                  historyDays: { type: integer, example: 90 }
+                  horizon: { type: integer, example: 30 }
+                  leadTime: { type: integer, example: 7 }
+                  weeks: { type: integer, example: 12 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/obat:
+    get:
+      tags: [stok-farmasi]
+      summary: Drug usage forecast and order advice per drug and branch, most urgent first
+      description: >-
+        Usage is sales (trxobat TrxJualObat Out) less cancelled sales (TrxStokAdjusCancel In) over the last 90 days,
+        weighted towards recent days. Safety stock = 1.65 x daily spread x sqrt(leadTime);
+        saranOrder = ceil(kebutuhan + safetyStock - stok). Status: habis, kritis (runs out before leadTime),
+        perlu-order, aman, tidak-bergerak.
+      operationId: analitikObat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string }, description: One of your branches; default all of them }
+        - { name: horizon, in: query, schema: { type: integer, minimum: 7, maximum: 90, default: 30 } }
+        - { name: leadTime, in: query, schema: { type: integer, minimum: 1, maximum: 60, default: 7 } }
+        - { name: q, in: query, schema: { type: string }, description: Drug name }
+        - { name: status, in: query, schema: { type: string, enum: [habis, kritis, perlu-order, aman, tidak-bergerak] } }
+      responses:
+        '200':
+          description: Forecast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        idObat: { type: integer }
+                        nama: { type: string }
+                        satuan: { type: string }
+                        cabang: { type: string }
+                        namaCabang: { type: string }
+                        stok: { type: number }
+                        stokMin: { type: number }
+                        avgHarian: { type: number }
+                        terpakai: { type: number }
+                        hari: { type: integer, description: Days of history }
+                        lowData: { type: boolean, description: Fewer than 30 days of history }
+                        kebutuhan: { type: number }
+                        safetyStock: { type: number }
+                        rop: { type: number, description: Reorder point = avgHarian x leadTime + safetyStock }
+                        hargaPokok: { type: number, nullable: true, description: Cost per stock unit; null when not plausible }
+                        estimasiBiaya: { type: number, nullable: true }
+                        saranOrder: { type: number }
+                        habisDalamHari: { type: number, nullable: true }
+                        status: { type: string }
+                  total: { type: integer }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  horizon: { type: integer }
+                  leadTime: { type: integer }
+                  ringkas: { type: object, additionalProperties: { type: integer }, description: Rows per status }
+                  biayaOrder: { type: number, description: Rp of the drugs to order with a plausible cost }
+                  orderTanpaHarga: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/penyakit:
+    get:
+      tags: [stok-farmasi]
+      summary: Weekly disease (ICD) trend, this week's spikes and next week's projection
+      description: >-
+        Visits per diagnosis in 7-day buckets ending today (cancelled sales left out). A spike is a week with at
+        least 5 cases, at least 1.5x and 3 more than the mean of the 4 weeks before.
+      operationId: analitikPenyakit
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+        - { name: weeks, in: query, schema: { type: integer, minimum: 4, maximum: 26, default: 12 } }
+        - { name: top, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 10 } }
+      responses:
+        '200':
+          description: Trend
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  weekStarts: { type: array, items: { type: string, format: date } }
+                  kunjungan: { type: array, items: { type: integer } }
+                  top: { type: array, items: { $ref: '#/components/schemas/AnalitikIcdTrend' } }
+                  lonjakan: { type: array, items: { $ref: '#/components/schemas/AnalitikIcdTrend' } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/diagnosa-obat:
+    get:
+      tags: [stok-farmasi]
+      summary: Drugs prescribed with each diagnosis (last 90 days) and the stock the projected cases call for
+      description: >-
+        An association (drugs in the same visits), not a treatment rule. saran.kebutuhan = projected weekly cases x
+        horizon/7 x units per case, summed over the diagnoses; an upper estimate.
+      operationId: analitikDiagnosaObat
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+        - { name: icd, in: query, schema: { type: string }, description: ICD code or name; default the 15 most frequent diagnoses }
+        - { name: horizon, in: query, schema: { type: integer, minimum: 7, maximum: 90, default: 30 } }
+      responses:
+        '200':
+          description: Diagnoses and drugs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  diagnosa:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        idIcd: { type: integer }
+                        kode: { type: string }
+                        nama: { type: string }
+                        kunjungan: { type: integer }
+                        proyeksiMinggu: { type: number }
+                        lonjakan: { type: boolean }
+                        obat:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              idObat: { type: integer }
+                              nama: { type: string }
+                              satuan: { type: string }
+                              kunjungan: { type: integer }
+                              qty: { type: number }
+                              support: { type: number, description: Share of the visits with the diagnosis that got the drug (0..1) }
+                              qtyPerKasus: { type: number }
+                  saran:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        idObat: { type: integer }
+                        nama: { type: string }
+                        satuan: { type: string }
+                        kebutuhan: { type: number }
+                        stok: { type: number }
+                        kurang: { type: number }
+                        dari: { type: array, items: { type: string } }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  horizon: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/ringkasan:
+    post:
+      tags: [stok-farmasi]
+      summary: AI executive summary (Indonesian) of the stock forecast and disease trend, kept per clinic day
+      description: Sends aggregates only (drug names, ICD codes, counts) to the DeepSeek API; no patient data.
+      operationId: analitikRingkasan
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cabang: { type: string, description: Default all of your branches }
+                refresh: { type: boolean, description: Ask again instead of returning the summary already made today }
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text: { type: string }
+                  cached: { type: boolean }
+                  today: { type: string, format: date }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: The AI declined to answer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: The AI service could not be reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: DEEPSEEK_API_KEY is not set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/analitik/chat:
+    post:
+      tags: [stok-farmasi]
+      summary: Ask the AI assistant about the stock and disease trends; it reads the analytics of the chosen branches
+      operationId: analitikChat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                cabang: { type: string }
+                messages:
+                  type: array
+                  maxItems: 20
+                  description: The conversation, alternating user/assistant and ending with a user message (questions max 2000 characters; earlier answers are cut to 6000)
+                  items:
+                    type: object
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+      responses:
+        '200':
+          description: The answer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: object, properties: { role: { type: string }, content: { type: string } } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: The AI declined to answer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: The AI service could not be reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: DEEPSEEK_API_KEY is not set
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/analitik/command:
+    get:
+      tags: [stok-farmasi]
+      summary: Command Center - KPIs, rule-based insights and weekly sales (last 12 weeks) of your branches
+      operationId: analitikCommand
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Command Center
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kpi:
+                    type: object
+                    properties:
+                      obatHabis: { type: integer }
+                      obatKritis: { type: integer }
+                      obatPerluOrder: { type: integer }
+                      biayaOrder: { type: number, description: Rp, drugs with a plausible cost price only }
+                      orderTanpaHarga: { type: integer }
+                      lonjakan: { type: integer }
+                      transaksi7: { type: integer }
+                      transaksi7Lalu: { type: integer }
+                      transaksiDelta: { type: number, nullable: true, description: percent }
+                      pendapatan30: { type: number }
+                      pendapatan30Lalu: { type: number }
+                      pendapatanDelta: { type: number, nullable: true }
+                      tidakBergerak: { type: integer }
+                  insights:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        level: { type: string, enum: [kritis, perhatian, info] }
+                        judul: { type: string }
+                        detail: { type: string }
+                  mingguan: { type: array, items: { $ref: '#/components/schemas/AnalitikKinerja' } }
+                  today: { type: string, format: date }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/kinerja:
+    get:
+      tags: [stok-farmasi]
+      summary: Clinic sales (transactions, visits, patients, revenue) of a period, grouped
+      description: Cancelled sales are left out. Time groupings are listed in time order, the others by revenue.
+      operationId: analitikKinerja
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+        - { name: dari, in: query, schema: { type: string, format: date }, description: Default 84 days before sampai }
+        - { name: sampai, in: query, schema: { type: string, format: date }, description: Default today; the period is at most 366 days }
+        - { name: kelompok, in: query, schema: { type: string, enum: [tanggal, minggu, bulan, hari, dokter, penjamin, jenis-rawat, cabang], default: minggu } }
+      responses:
+        '200':
+          description: Sales
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { $ref: '#/components/schemas/AnalitikKinerja' } }
+                  total: { $ref: '#/components/schemas/AnalitikKinerja' }
+                  dari: { type: string, format: date }
+                  sampai: { type: string, format: date }
+                  kelompok: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/kualitas-data:
+    get:
+      tags: [stok-farmasi]
+      summary: Data-quality checks of your branches (duplicate patients, visits without diagnosis, negative stock, implausible prices, default expiry dates, implausible vital signs, missing birth dates)
+      description: Checks only flag records; nothing is changed. Each check returns its total and up to 50 examples.
+      operationId: analitikKualitasData
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Checks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kode: { type: string }
+                        judul: { type: string }
+                        penjelasan: { type: string }
+                        jumlah: { type: integer }
+                        kolom: { type: array, items: { type: string } }
+                        contoh: { type: array, items: { type: array, items: { type: string } } }
+                  maxContoh: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/follow-up:
+    get:
+      tags: [stok-farmasi]
+      summary: Chronic patients (hypertension, diabetes, dyslipidaemia, asthma) who have not been back
+      description: >-
+        Patients with the chronic diagnosis on at least two visit days in the last year whose last visit (for any
+        reason) is at least `hari` days ago. Up to 2000 rows; the list stays in the app (it is not sent to the AI).
+      operationId: analitikFollowUp
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: cabang, in: query, schema: { type: string } }
+        - { name: hari, in: query, schema: { type: integer, minimum: 14, maximum: 180, default: 35 } }
+        - { name: kelompok, in: query, schema: { type: string, enum: [hipertensi, diabetes, dislipidemia, asma] } }
+      responses:
+        '200':
+          description: Patients to follow up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        idPasien: { type: integer }
+                        noRm: { type: string }
+                        nama: { type: string }
+                        telp: { type: string }
+                        kelompok: { type: string }
+                        kodeIcd: { type: string }
+                        terakhir: { type: string, format: date }
+                        hariSejak: { type: integer }
+                        jumlahKontrol: { type: integer }
+                        cabang: { type: string }
+                  total: { type: integer }
+                  hari: { type: integer }
+                  kelompok: { type: array, items: { type: object, properties: { kode: { type: string }, nama: { type: string } } } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/analitik/saran-icd:
+    post:
+      tags: [transaksi-klinik]
+      summary: ICD-10 candidates for a clinical description (Pengobatan form)
+      description: >-
+        Guarded by the Pengobatan menu item. With DEEPSEEK_API_KEY set, the assistant proposes codes from the
+        description only (no patient identity); codes missing from the ICD master are dropped. Matches of the ICD
+        master's search follow. Without the key, only the search runs.
+      operationId: analitikSaranIcd
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deskripsi]
+              properties:
+                deskripsi: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ai: { type: boolean, description: Whether the assistant's candidates are included }
+                  aiError: { type: string }
+                  kandidat:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        kode: { type: string }
+                        nama: { type: string }
+                        jenis: { type: string }
+                        alasan: { type: string }
+                        sumber: { type: string, enum: [ai, pencarian] }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/riwayat-pasien/pasien:
+    get:
+      tags: [front-office-klinik]
+      summary: Search the patients of your branches by name, No RM, NIK or address (Riwayat Pasien)
+      operationId: riwayatPasienSearch
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2 } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: Patients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  unfilteredTotal: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/riwayat-pasien/{id}:
+    get:
+      tags: [front-office-klinik]
+      summary: A patient's visits at your branches and their structured summary (no AI)
+      description: >-
+        Up to 200 visits, newest first, with examination, vital signs, diagnoses, prescriptions and procedures. The
+        summary (recurring diagnoses, frequent drugs, last 10 vital signs with BMI) is computed from the records.
+        A patient of other branches answers 404.
+      operationId: riwayatPasienGet
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: History
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pasien: { type: object }
+                  ringkasan: { type: object }
+                  kunjungan: { type: array, items: { type: object } }
+                  maxKunjungan: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/mcu/form/{form}/registrasi:
+    get:
+      tags: [mcu]
+      summary: MCU registrations of a period with the status of one result form
+      description: >-
+        One of the 16 MCU result forms; each is guarded by its own menu item (/mcu/pemeriksaan-fisik, /mcu/riwayat-medis,
+        /mcu/pemeriksaan-lab, /mcu/pemeriksaan-audiometri, /mcu/riwayat-kesehatan-keluarga, /mcu/riwayat-khusus-wanita,
+        /mcu/riwayat-opname-operasi, /mcu/kebiasaan-pasien, /mcu/riwayat-pekerjaan, /mcu/anamnesa, /mcu/pemeriksaan-gigi,
+        /mcu/rontgen-thorax, /mcu/ekg, /mcu/ekg-treadmill, /mcu/spirometry, /mcu/usg). Cancelled registrations are left
+        out unless cancel=1.
+      operationId: mcuRegistrasi
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: form, in: path, required: true, schema: { $ref: '#/components/schemas/McuForm' } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: Default 30 days before to }
+        - { name: to, in: query, schema: { type: string, format: date }, description: Default today }
+        - { name: q, in: query, schema: { type: string }, description: Name, RM, NIK, company or registration id }
+        - { name: cancel, in: query, schema: { type: string, enum: ['1'] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
+      responses:
+        '200':
+          description: Registrations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { $ref: '#/components/schemas/McuRegistrasi' } }
+                  total: { type: integer }
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  today: { type: string, format: date }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu/form/{form}/katalog:
+    get:
+      tags: [mcu]
+      summary: The form's sections, items and answers from the MCU examination catalogue
+      description: Filled for fisik, riwayat-medis, khusus-wanita, rontgen, ekg and usg (organ list); empty for the other forms.
+      operationId: mcuKatalog
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: form, in: path, required: true, schema: { $ref: '#/components/schemas/McuForm' } }
+      responses:
+        '200':
+          description: Catalogue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  form: { type: string }
+                  title: { type: string }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kode: { type: string }
+                        nama: { type: string }
+                        grup: { type: string }
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              key: { type: string, description: check_up_type.item_id }
+                              nama: { type: string }
+                              options: { type: array, items: { type: object, properties: { nama: { type: string }, entry: { type: string, enum: [radio, text] } } } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/mcu/form/{form}/{id}:
+    get:
+      tags: [mcu]
+      summary: An MCU registration and the form's saved result (the lab form also lists the ordered examinations, packages expanded)
+      operationId: mcuHasilGet
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: form, in: path, required: true, schema: { $ref: '#/components/schemas/McuForm' } }
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registrasi: { $ref: '#/components/schemas/McuRegistrasi' }
+                  hasil: { $ref: '#/components/schemas/McuHasil' }
+                  lab:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        labId: { type: integer }
+                        kode: { type: string }
+                        nama: { type: string }
+                        grup: { type: string }
+                        paket: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [mcu]
+      summary: Replace the form's result (status, conclusion and answers)
+      description: Empty answers are dropped. A cancelled registration answers 409.
+      operationId: mcuHasilSave
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: form, in: path, required: true, schema: { $ref: '#/components/schemas/McuForm' } }
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [normal, abnormal, ''] }
+                kesimpulan: { type: string, maxLength: 4000 }
+                values:
+                  type: object
+                  maxProperties: 800
+                  additionalProperties: { type: object, properties: { value: { type: string }, note: { type: string } } }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasil: { $ref: '#/components/schemas/McuHasil' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The registration is cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    webhookSecret:
+      type: apiKey
+      in: header
+      name: X-Webhook-Secret
+      description: The value of N8N_WEBHOOK_SECRET; used only by the n8n callback.
 
   responses:
     BadRequest:
@@ -5689,6 +7147,59 @@ components:
             error: internal server error
 
   schemas:
+    McuForm:
+      type: string
+      enum: [fisik, riwayat-medis, lab, audiometri, riwayat-keluarga, khusus-wanita, opname-operasi, kebiasaan, pekerjaan, anamnesa, gigi, rontgen, ekg, treadmill, spirometri, usg]
+    McuRegistrasi:
+      type: object
+      properties:
+        id: { type: integer }
+        tanggal: { type: string, format: date }
+        status: { type: string, enum: [New, Close, Cancel] }
+        pasienId: { type: integer }
+        rm: { type: string }
+        nama: { type: string }
+        gender: { type: string }
+        tglLahir: { type: string, format: date, nullable: true }
+        usia: { type: integer, nullable: true }
+        perusahaan: { type: string }
+        departemen: { type: string }
+        jabatan: { type: string }
+        formStatus: { type: string, nullable: true, description: 'normal, abnormal or empty; null when the form is not filled' }
+    McuHasil:
+      type: object
+      properties:
+        status: { type: string }
+        kesimpulan: { type: string }
+        updatedBy: { type: string }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        values:
+          type: object
+          additionalProperties: { type: object, properties: { value: { type: string }, note: { type: string } } }
+    AnalitikKinerja:
+      type: object
+      properties:
+        kelompok: { type: string }
+        transaksi: { type: integer, description: Sales, over-the-counter included }
+        kunjungan: { type: integer, description: Sales of a registered visit }
+        pasien: { type: integer }
+        pendapatan: { type: number }
+        obat: { type: number }
+        tindakan: { type: number }
+        penunjang: { type: number }
+    AnalitikIcdTrend:
+      type: object
+      properties:
+        idIcd: { type: integer }
+        kode: { type: string }
+        nama: { type: string }
+        weeks: { type: array, items: { type: integer }, description: Visits per week, oldest first }
+        total: { type: integer }
+        mingguIni: { type: integer }
+        rataSebelum: { type: number }
+        rasio: { type: number }
+        lonjakan: { type: boolean }
+        proyeksiMinggu: { type: number }
     PengobatanDetail:
       type: object
       properties:
@@ -6436,6 +7947,33 @@ components:
           properties:
             id: { type: integer }
 
+    SettingBarcodeInput:
+      type: object
+      description: Margins, row positions, barcode size/position and font size of the label; null means not set.
+      properties:
+        left: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        middle: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        right: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row1: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row2: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row3: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row4: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row5: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        row6: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        barcodeWidth: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        barcodeHeight: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        barcodeLeft: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        barcodeTop: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        fontSize: { type: number, nullable: true, minimum: 0, maximum: 10000 }
+        isActive: { type: boolean, description: "isactive 1 or 0" }
+
+    SettingBarcode:
+      allOf:
+        - $ref: '#/components/schemas/SettingBarcodeInput'
+        - type: object
+          properties:
+            id: { type: integer }
+
     PaketPriceInput:
       type: object
       required: [idPerusahaan, nama, fromDate, toDate, price, labIds]
@@ -6635,3 +8173,82 @@ components:
           description: Field name to message
           additionalProperties:
             type: string
+
+    ComplaintInput:
+      type: object
+      description: The n8n smart-router body. Only message is required; recipient is required for type email.
+      required: [message]
+      properties:
+        title: {type: string, maxLength: 100, default: AI Assistant, example: AI Assistant}
+        subject: {type: string, maxLength: 150, default: Analyze Customer Complaint, example: Analyze Customer Complaint}
+        message: {type: string, maxLength: 5000, example: Pelanggan mengeluhkan keterlambatan pengiriman}
+        type: {type: string, enum: [ai, erp, email], default: ai, example: ai}
+        recipient: {type: string, format: email, description: Required when type is email}
+        customerName: {type: string, maxLength: 100, description: Optional}
+        customerContact: {type: string, maxLength: 100, description: Optional}
+        channel: {type: string, maxLength: 30, default: app, description: Optional}
+
+    RouterRequest:
+      type: object
+      required: [title, subject, message, type]
+      properties:
+        title: {type: string, maxLength: 100, example: Email}
+        subject: {type: string, maxLength: 150, example: send_notification}
+        message: {type: string, maxLength: 5000, example: Pesanan Anda sedang diproses dan akan segera dikirim.}
+        type: {type: string, enum: [ai, erp, email], example: email}
+        recipient: {type: string, format: email, description: Required when type is email, example: customer@example.com}
+
+    ComplaintAnalysis:
+      type: object
+      required: [category, sentiment, priority]
+      properties:
+        category: {type: string, maxLength: 50, example: pengiriman}
+        sentiment: {type: string, enum: [positive, neutral, negative], example: negative}
+        priority: {type: string, enum: [low, medium, high, urgent], example: high}
+        summary: {type: string, maxLength: 2000, example: Paket terlambat 5 hari}
+
+    Complaint:
+      type: object
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        subject: {type: string}
+        customerName: {type: string}
+        customerContact: {type: string}
+        channel: {type: string}
+        message: {type: string}
+        category: {type: string, nullable: true}
+        sentiment: {type: string, nullable: true, enum: [positive, neutral, negative]}
+        priority: {type: string, nullable: true, enum: [low, medium, high, urgent]}
+        summary: {type: string, nullable: true}
+        aiStatus: {type: string, enum: [pending, processing, analyzed, failed]}
+        aiError: {type: string, nullable: true}
+        aiAttempts: {type: integer}
+        handlingStatus: {type: string, enum: [open, in_progress, resolved, closed]}
+        handlingNote: {type: string, nullable: true}
+        createdBy: {type: string}
+        updatedBy: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        analyzedAt: {type: string, format: date-time, nullable: true}
+
+    ComplaintLog:
+      type: object
+      properties:
+        id: {type: integer}
+        attempt: {type: integer}
+        event: {type: string, enum: [sent, error, analyzed, invalid_output, callback_error, failed]}
+        httpStatus: {type: integer, nullable: true}
+        message: {type: string}
+        durationMs: {type: integer, nullable: true}
+        createdAt: {type: string, format: date-time}
+
+    ComplaintSummary:
+      type: object
+      properties:
+        total: {type: integer}
+        byCategory: {type: object, additionalProperties: {type: integer}}
+        bySentiment: {type: object, additionalProperties: {type: integer}}
+        byPriority: {type: object, additionalProperties: {type: integer}}
+        byAiStatus: {type: object, additionalProperties: {type: integer}}
+        byHandlingStatus: {type: object, additionalProperties: {type: integer}}

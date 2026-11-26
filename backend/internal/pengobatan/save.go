@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/example/be_jwt_golang/backend/internal/pendaftaran"
+	"github.com/example/be_jwt_golang/backend/internal/stoklog"
 )
 
 // Saving a treatment sale (the form's Save) follows the legacy data:
@@ -389,11 +390,13 @@ func (p *PostgresRepository) Save(ctx context.Context, in SaveInput, user string
 
 	// Lines, and the stock they use.
 	for _, o := range obat {
-		if _, err := tx.Exec(ctx, `INSERT INTO trxjualobat (id_jual, id_obat, hjual, byk, hp, dosis, ppn) VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7)`,
-			res.ID, o.IDObat, o.harga, o.Byk, o.hp, o.Dosis, o.ppn); err != nil {
+		var idLine int
+		if err := tx.QueryRow(ctx, `INSERT INTO trxjualobat (id_jual, id_obat, hjual, byk, hp, dosis, ppn) VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7)
+			RETURNING id`, res.ID, o.IDObat, o.harga, o.Byk, o.hp, o.Dosis, o.ppn).Scan(&idLine); err != nil {
 			return res, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE trxstock SET stok = stok - $1 WHERE id_obat = $2 AND cabang = $3`, o.Byk, o.IDObat, in.Cabang); err != nil {
+		if _, _, err := stoklog.Move(ctx, tx, stoklog.Entry{IDObat: o.IDObat, Cabang: in.Cabang, Delta: -o.Byk,
+			TableRef: stoklog.RefJual, IDRef: idLine, Remarks: "Transaksi " + res.NoKwi, User: user}); err != nil {
 			return res, err
 		}
 	}

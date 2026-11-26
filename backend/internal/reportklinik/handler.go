@@ -55,6 +55,15 @@ const DiagnosaPath = "/report-klinik/report-diagnosa"
 // DinkesPath is Report Klinik > Report ICD Dinkes.
 const DinkesPath = "/report-klinik/report-icd-dinkes"
 
+// StokOpnamePath is Stok Farmasi > Stok Opname.
+const StokOpnamePath = "/stok-farmasi/stok-opname"
+
+// StokAlertPath is Stok Farmasi > Stok Alert.
+const StokAlertPath = "/stok-farmasi/stok-alert"
+
+// StokTracePath is Stok Farmasi > Stok Trace.
+const StokTracePath = "/stok-farmasi/stok-trace"
+
 // MaxPageSize caps one request; exports ask for up to this many rows.
 const MaxPageSize = 5000
 
@@ -99,6 +108,12 @@ func (h *Handler) Routes(mux *http.ServeMux, requireAuth func(http.Handler) http
 	mux.Handle("GET /api/report-klinik/diagnosa/options", guard(DiagnosaPath, h.PendapatanOptions))
 	mux.Handle("GET /api/report-klinik/icd-dinkes", guard(DinkesPath, h.ReportDinkes))
 	mux.Handle("GET /api/report-klinik/icd-dinkes/options", guard(DinkesPath, h.PeriodOptions))
+	mux.Handle("GET /api/stok-farmasi/stok-opname", guard(StokOpnamePath, h.StokOpname))
+	mux.Handle("GET /api/stok-farmasi/stok-opname/options", guard(StokOpnamePath, h.StokOpnameOptions))
+	mux.Handle("GET /api/stok-farmasi/stok-alert/minim-stok", guard(StokAlertPath, h.MinimStok))
+	mux.Handle("GET /api/stok-farmasi/stok-alert/options", guard(StokAlertPath, h.StokOpnameOptions))
+	mux.Handle("GET /api/stok-farmasi/stok-trace/obat", guard(StokTracePath, h.StokTraceObat))
+	mux.Handle("GET /api/stok-farmasi/stok-trace", guard(StokTracePath, h.StokTrace))
 }
 
 func (h *Handler) branches(r *http.Request) ([]branchauth.Branch, error) {
@@ -911,6 +926,142 @@ func (h *Handler) ReportDinkes(w http.ResponseWriter, r *http.Request) {
 	res, err := h.repo.ReportDinkes(r.Context(), DinkesParams{
 		Branches: codes, From: from, To: to, Search: strings.TrimSpace(q.Get("q")),
 		Sort: sort, Desc: desc, Limit: size, Offset: (page - 1) * size,
+	})
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"rows": res.Rows, "total": res.Total, "unfilteredTotal": res.UnfilteredTotal, "from": from, "to": to,
+	})
+}
+
+// StokOpname returns one page of drugs per branch at the caller's branches with
+// their stock, minimum stock and prices, by drug id.
+//
+// Query: cabang, page, size (1..5000), q, sort (idObat, nama, hargaJual,
+// hargaBeli, beratIsi, jenis, satuanBeli, satuanJual, jumUnit, stokMin, stok,
+// cabang), dir, nama, jenis (refjenisobat id), aktif (1 or 0).
+func (h *Handler) StokOpname(w http.ResponseWriter, r *http.Request) {
+	h.stokList(w, r, false, "idObat")
+}
+
+// MinimStok is Stok Alert's "Obat Minim Stok" tab: the Stok Opname rows whose
+// stock is below the minimum (trxstock.stok_min > stok), by drug name. Same
+// query parameters as StokOpname.
+func (h *Handler) MinimStok(w http.ResponseWriter, r *http.Request) {
+	h.stokList(w, r, true, "nama")
+}
+
+func (h *Handler) stokList(w http.ResponseWriter, r *http.Request, belowMin bool, defaultSort string) {
+	codes, _, _, ok := h.period(w, r)
+	if !ok {
+		return
+	}
+	if len(codes) == 0 {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"rows": []OpnameRow{}, "total": 0, "unfilteredTotal": 0})
+		return
+	}
+	q := r.URL.Query()
+	size := intParam(r, "size", 10, 1, MaxPageSize)
+	page := intParam(r, "page", 1, 1, 1_000_000)
+	sort := q.Get("sort")
+	desc := q.Get("dir") == "desc"
+	if !OpnameSortable(sort) {
+		sort, desc = defaultSort, false
+	}
+	var aktif *bool
+	switch q.Get("aktif") {
+	case "1":
+		v := true
+		aktif = &v
+	case "0":
+		v := false
+		aktif = &v
+	}
+	res, err := h.repo.StokOpname(r.Context(), OpnameParams{
+		Branches: codes, Search: strings.TrimSpace(q.Get("q")), Nama: strings.TrimSpace(q.Get("nama")), IDJenis: optInt(r, "jenis"), Aktif: aktif, BelowMin: belowMin,
+		Sort: sort, Desc: desc, Limit: size, Offset: (page - 1) * size,
+	})
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"rows": res.Rows, "total": res.Total, "unfilteredTotal": res.UnfilteredTotal})
+}
+
+// StokOpnameOptions returns the drug types and the caller's branches.
+func (h *Handler) StokOpnameOptions(w http.ResponseWriter, r *http.Request) {
+	jenis, err := h.repo.JenisObat(r.Context())
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	branches, err := h.branches(r)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"jenis": jenis, "branches": branches})
+}
+
+// StokTraceObat lists the drugs stocked at one of the caller's branches for
+// Stok Trace's "Obat" lookup, by id. Query: cabang (required).
+func (h *Handler) StokTraceObat(w http.ResponseWriter, r *http.Request) {
+	c := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("cabang")))
+	if c == "" {
+		httpx.WriteValidation(w, httpx.FieldErrors{"cabang": "Pilih Cabang"})
+		return
+	}
+	branches, err := h.branches(r)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	if !branchauth.Has(branches, c) {
+		httpx.WriteError(w, http.StatusForbidden, "you are not assigned to branch "+c)
+		return
+	}
+	list, err := h.repo.ObatCabang(r.Context(), c)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"rows": list})
+}
+
+// StokTrace returns one page of the stock movements (trxobat) at one of the
+// caller's branches in the period, oldest first, of one drug or of all.
+//
+// Query: cabang (required), obat (refobat id; empty or 0 = every drug), from,
+// to (YYYY-MM-DD of createddate, default today), page, size (1..5000), q,
+// sort (id, createdDate, nama, lastStock, inOut, byk, stock, createdBy,
+// transaksi, remarks, cabang), dir.
+func (h *Handler) StokTrace(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	c := strings.ToUpper(strings.TrimSpace(q.Get("cabang")))
+	if c == "" {
+		httpx.WriteValidation(w, httpx.FieldErrors{"cabang": "Pilih Cabang"})
+		return
+	}
+	codes, from, to, ok := h.period(w, r) // checks the branch is the caller's, and the dates
+	if !ok {
+		return
+	}
+	if len(codes) != 1 {
+		httpx.WriteError(w, http.StatusForbidden, "you are not assigned to branch "+c)
+		return
+	}
+	size := intParam(r, "size", 10, 1, MaxPageSize)
+	page := intParam(r, "page", 1, 1, 1_000_000)
+	sort := q.Get("sort")
+	desc := q.Get("dir") == "desc"
+	if !TraceSortable(sort) {
+		sort, desc = "id", false // in the order they happened, like the legacy page
+	}
+	res, err := h.repo.StokTrace(r.Context(), TraceParams{
+		Cabang: codes[0], IDObat: optInt(r, "obat"), From: from, To: to,
+		Search: strings.TrimSpace(q.Get("q")), Sort: sort, Desc: desc, Limit: size, Offset: (page - 1) * size,
 	})
 	if err != nil {
 		httpx.InternalError(w, err)

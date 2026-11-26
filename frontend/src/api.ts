@@ -494,6 +494,29 @@ export interface NonLab extends NonLabInput {
   id: number;
 }
 
+/** Setting > Barcode: the MCU barcode label layout (refsettingbarcode). null = not set. */
+export interface SettingBarcodeInput {
+  left: number | null;
+  middle: number | null;
+  right: number | null;
+  row1: number | null;
+  row2: number | null;
+  row3: number | null;
+  row4: number | null;
+  row5: number | null;
+  row6: number | null;
+  barcodeWidth: number | null;
+  barcodeHeight: number | null;
+  barcodeLeft: number | null;
+  barcodeTop: number | null;
+  fontSize: number | null;
+  isActive: boolean;
+}
+
+export interface SettingBarcode extends SettingBarcodeInput {
+  id: number;
+}
+
 /** Setting > Paket Price: an MCU package (refpriceheader) as listed. Dates are YYYY-MM-DD. */
 export interface PaketPrice {
   id: number;
@@ -1331,6 +1354,125 @@ export interface AllStokOptions {
   today: string;
 }
 
+/** Stok Farmasi > Stok Opname: one drug at one branch with its stock and prices. */
+export interface StokOpname {
+  idObat: number;
+  nama: string;
+  hargaJual: number;
+  hargaBeli: number;
+  beratIsi: string;
+  idJenis: number | null;
+  jenis: string;
+  satuanBeli: string;
+  satuanJual: string;
+  jumUnit: number;
+  stokMin: number;
+  stok: number;
+  cabang: string;
+  namaCabang: string;
+  kenaPajak: boolean;
+  isActive: boolean;
+}
+
+export interface StokOpnameQuery {
+  page: number;
+  size: number;
+  q?: string;
+  sort?: string;
+  dir?: string;
+  cabang?: string;
+  nama?: string;
+  jenis?: number;
+  aktif?: "1" | "0";
+}
+
+export interface StokOpnameOptions {
+  jenis: { id: number; name: string }[];
+  branches: { kode: string; nama: string }[];
+}
+
+/** Stok Farmasi > Stok Adjusment: a manual stock correction. status 1 = Masuk, 0 = Keluar. */
+export interface StokAdjus {
+  id: number;
+  tanggal: string | null;
+  idObat: number;
+  nama: string;
+  status: 0 | 1;
+  statusDesc: string;
+  ket: string;
+  byk: number;
+  cabang: string;
+  namaCabang: string;
+}
+
+export interface StokAdjusQuery {
+  from: string;
+  to: string;
+  page: number;
+  size: number;
+  q?: string;
+  sort?: string;
+  dir?: string;
+  cabang?: string;
+  nama?: string;
+  ket?: string;
+  status?: "1" | "0";
+}
+
+export interface StokAdjusOptions {
+  branches: { kode: string; nama: string }[];
+  today: string;
+  defaultFrom: string;
+}
+
+export interface StokAdjusObat {
+  id: number;
+  nama: string;
+  jenis: string;
+  satuan: string;
+  stok: number;
+}
+
+/** Stok Farmasi > Stok Trace: one stock movement (trxobat). */
+export interface StokTrace {
+  id: number;
+  idObat: number;
+  nama: string;
+  cabang: string;
+  namaCabang: string;
+  lastStock: number;
+  inOut: string;
+  byk: number;
+  stock: number;
+  systemStock: number;
+  tableRef: string;
+  transaksi: string;
+  remarks: string;
+  createdBy: string;
+  createdDate: string; // "YYYY-MM-DD HH:MM:SS.mmm"
+}
+
+export interface StokTraceQuery {
+  cabang: string;
+  obat?: number;
+  from: string;
+  to: string;
+  page: number;
+  size: number;
+  q?: string;
+  sort?: string;
+  dir?: string;
+}
+
+export interface StokAdjusSaveInput {
+  cabang: string;
+  tanggal: string;
+  idObat: number;
+  status: 0 | 1;
+  byk: number;
+  ket: string;
+}
+
 /** Report Klinik > Rujukan: a sale of an external doctor, once per supporting examination. */
 export interface Rujukan {
   idJual: number;
@@ -1594,6 +1736,330 @@ export interface PenerimaanSaveResult {
 /** Fields of the patient "Pencarian" panel in the registration form. */
 export type PasienSearchField = "norm" | "nama" | "umur" | "alamat" | "jamkes";
 
+/** Stok Farmasi > Analitik. */
+export type AnalitikStatus = "habis" | "kritis" | "perlu-order" | "aman" | "tidak-bergerak";
+
+export interface AnalitikOptions {
+  branches: { kode: string; nama: string }[];
+  today: string;
+  /** false when the backend has no DEEPSEEK_API_KEY. */
+  aiEnabled: boolean;
+  historyDays: number;
+  horizon: number;
+  leadTime: number;
+  weeks: number;
+}
+
+/** Usage forecast and order advice for one drug at one branch. */
+export interface AnalitikObat {
+  idObat: number;
+  nama: string;
+  satuan: string;
+  cabang: string;
+  namaCabang: string;
+  stok: number;
+  stokMin: number;
+  avgHarian: number;
+  terpakai: number;
+  hari: number;
+  lowData: boolean;
+  kebutuhan: number;
+  safetyStock: number;
+  rop: number;
+  hargaPokok: number | null;
+  estimasiBiaya: number | null;
+  saranOrder: number;
+  habisDalamHari: number | null;
+  status: AnalitikStatus;
+}
+
+export interface AnalitikObatResult {
+  rows: AnalitikObat[];
+  total: number;
+  from: string;
+  to: string;
+  horizon: number;
+  leadTime: number;
+  ringkas: Partial<Record<AnalitikStatus, number>>;
+  biayaOrder: number;
+  orderTanpaHarga: number;
+}
+
+export interface AnalitikIcdTrend {
+  idIcd: number;
+  kode: string;
+  nama: string;
+  weeks: number[];
+  total: number;
+  mingguIni: number;
+  rataSebelum: number;
+  rasio: number;
+  lonjakan: boolean;
+  proyeksiMinggu: number;
+}
+
+export interface AnalitikPenyakit {
+  weekStarts: string[];
+  kunjungan: number[];
+  top: AnalitikIcdTrend[];
+  lonjakan: AnalitikIcdTrend[];
+}
+
+export interface AnalitikResep {
+  idObat: number;
+  nama: string;
+  satuan: string;
+  kunjungan: number;
+  qty: number;
+  support: number;
+  qtyPerKasus: number;
+}
+
+export interface AnalitikDiagnosa {
+  idIcd: number;
+  kode: string;
+  nama: string;
+  kunjungan: number;
+  proyeksiMinggu: number;
+  lonjakan: boolean;
+  obat: AnalitikResep[];
+}
+
+export interface AnalitikSaran {
+  idObat: number;
+  nama: string;
+  satuan: string;
+  kebutuhan: number;
+  stok: number;
+  kurang: number;
+  dari: string[];
+}
+
+export interface AnalitikDiagnosaObatResult {
+  diagnosa: AnalitikDiagnosa[];
+  saran: AnalitikSaran[];
+  from: string;
+  to: string;
+  horizon: number;
+}
+
+export interface AnalitikChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AnalitikKinerja {
+  kelompok: string;
+  transaksi: number;
+  kunjungan: number;
+  pasien: number;
+  pendapatan: number;
+  obat: number;
+  tindakan: number;
+  penunjang: number;
+}
+
+export interface AnalitikKPI {
+  obatHabis: number;
+  obatKritis: number;
+  obatPerluOrder: number;
+  biayaOrder: number;
+  orderTanpaHarga: number;
+  lonjakan: number;
+  transaksi7: number;
+  transaksi7Lalu: number;
+  transaksiDelta: number | null;
+  pendapatan30: number;
+  pendapatan30Lalu: number;
+  pendapatanDelta: number | null;
+  tidakBergerak: number;
+}
+
+export interface AnalitikInsight {
+  level: "kritis" | "perhatian" | "info";
+  judul: string;
+  detail: string;
+}
+
+export interface AnalitikCommand {
+  kpi: AnalitikKPI;
+  insights: AnalitikInsight[];
+  mingguan: AnalitikKinerja[];
+  today: string;
+}
+
+export interface AnalitikCekKualitas {
+  kode: string;
+  judul: string;
+  penjelasan: string;
+  jumlah: number;
+  kolom: string[];
+  contoh: string[][];
+}
+
+export interface AnalitikFollowUp {
+  idPasien: number;
+  noRm: string;
+  nama: string;
+  telp: string;
+  kelompok: string;
+  kodeIcd: string;
+  terakhir: string;
+  hariSejak: number;
+  jumlahKontrol: number;
+  cabang: string;
+}
+
+export interface IcdKandidat {
+  id: number;
+  kode: string;
+  nama: string;
+  jenis: string;
+  alasan: string;
+  sumber: "ai" | "pencarian";
+}
+
+/** Front Office Klinik > Riwayat Pasien. */
+export interface RiwayatItem {
+  kode?: string;
+  nama: string;
+  byk?: number | null;
+  dosis?: string;
+}
+
+export interface RiwayatKunjungan {
+  idJual: number;
+  tgl: string;
+  noKwi: string;
+  cabang: string;
+  dokter: string;
+  jenisRawat: string;
+  batal: boolean;
+  total: number | null;
+  keluhan: string;
+  anamnesis: string;
+  sistole: number | null;
+  diastole: number | null;
+  bb: number | null;
+  tb: number | null;
+  suhu: number | null;
+  hasilDokter: string;
+  rencana: string;
+  diagnosa: RiwayatItem[];
+  resep: RiwayatItem[];
+  tindakan: RiwayatItem[];
+}
+
+export interface RiwayatJumlah {
+  kode?: string;
+  nama: string;
+  kali: number;
+  terakhir: string;
+}
+
+export interface RiwayatVital {
+  tgl: string;
+  sistole: number | null;
+  diastole: number | null;
+  bb: number | null;
+  tb: number | null;
+  imt: number | null;
+}
+
+export interface RiwayatPasien {
+  pasien: {
+    id: number;
+    noRm: string;
+    nama: string;
+    tglLahir: string | null;
+    usia: number | null;
+    jenisKelamin: string;
+    alamat: string;
+    telp: string;
+    alergi: string;
+    penjamin: string;
+    cabang: string;
+  };
+  ringkasan: {
+    jumlahKunjungan: number;
+    pertama: string;
+    terakhir: string;
+    cabang: string[];
+    diagnosa: RiwayatJumlah[];
+    obat: RiwayatJumlah[];
+    vital: RiwayatVital[];
+  };
+  kunjungan: RiwayatKunjungan[];
+  maxKunjungan: number;
+}
+
+export interface RiwayatPasienHit {
+  id: number;
+  noRm: string;
+  nama: string;
+  tglLahir: string | null;
+  alamat: string;
+  nik: string;
+  hp: string;
+  cabang: string;
+}
+
+/** MCU result forms (MCU > Pemeriksaan Fisik … USG). */
+export interface McuRegistrasi {
+  id: number;
+  tanggal: string;
+  status: string;
+  pasienId: number;
+  rm: string;
+  nama: string;
+  gender: string;
+  tglLahir: string | null;
+  usia: number | null;
+  perusahaan: string;
+  departemen: string;
+  jabatan: string;
+  formStatus: string | null;
+}
+
+export interface McuOption {
+  nama: string;
+  entry: "radio" | "text" | string;
+}
+
+export interface McuItem {
+  key: string;
+  nama: string;
+  options: McuOption[];
+}
+
+export interface McuSection {
+  kode: string;
+  nama: string;
+  grup: string;
+  items: McuItem[];
+}
+
+export interface McuValue {
+  value: string;
+  note: string;
+}
+
+export interface McuHasil {
+  status: string;
+  kesimpulan: string;
+  updatedBy: string;
+  updatedAt: string | null;
+  values: Record<string, McuValue>;
+}
+
+export interface McuLabItem {
+  labId: number;
+  kode: string;
+  nama: string;
+  grup: string;
+  paket: string;
+}
+
 async function request<T>(path: string, options: { method?: string; body?: unknown; token?: string | null } = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
@@ -1772,6 +2238,10 @@ export const api = {
   nonLab: (token: string) => request<{ nonLab: NonLab[] }>("/api/non-lab", { token }),
   createNonLab: (token: string, input: NonLabInput) => request<NonLab>("/api/non-lab", { method: "POST", body: input, token }),
   updateNonLab: (token: string, id: number, input: NonLabInput) => request<NonLab>(`/api/non-lab/${id}`, { method: "PUT", body: input, token }),
+  // Setting > Barcode
+  settingBarcode: (token: string) => request<{ setting: SettingBarcode[] }>("/api/setting-barcode", { token }),
+  updateSettingBarcode: (token: string, id: number, input: SettingBarcodeInput) =>
+    request<SettingBarcode>(`/api/setting-barcode/${id}`, { method: "PUT", body: input, token }),
   // Setting > Paket Price
   paketPrice: (token: string) => request<{ paket: PaketPrice[] }>("/api/paket-price", { token }),
   paketPriceOptions: (token: string) => request<PaketPriceOptions>("/api/paket-price/options", { token }),
@@ -1882,6 +2352,25 @@ export const api = {
     return request<{ rows: AllStok[]; total: number; unfilteredTotal: number }>(`/api/report-klinik/all-stok?${qs}`, { token });
   },
   allStokOptions: (token: string) => request<AllStokOptions>("/api/report-klinik/all-stok/options", { token }),
+  stokOpname: (token: string, params: StokOpnameQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: StokOpname[]; total: number; unfilteredTotal: number }>(`/api/stok-farmasi/stok-opname?${qs}`, { token });
+  },
+  stokOpnameOptions: (token: string) => request<StokOpnameOptions>("/api/stok-farmasi/stok-opname/options", { token }),
+  minimStok: (token: string, params: StokOpnameQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: StokOpname[]; total: number; unfilteredTotal: number }>(`/api/stok-farmasi/stok-alert/minim-stok?${qs}`, { token });
+  },
+  stokAlertOptions: (token: string) => request<StokOpnameOptions>("/api/stok-farmasi/stok-alert/options", { token }),
+  stokTrace: (token: string, params: StokTraceQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: StokTrace[]; total: number; unfilteredTotal: number; from: string; to: string }>(`/api/stok-farmasi/stok-trace?${qs}`, { token });
+  },
+  stokTraceObat: (token: string, cabang: string) =>
+    request<{ rows: StokAdjusObat[] }>(`/api/stok-farmasi/stok-trace/obat?cabang=${encodeURIComponent(cabang)}`, { token }),
   rujukan: (token: string, params: RujukanQuery) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
@@ -1929,6 +2418,16 @@ export const api = {
   penerimaanDetail: (token: string, id: number) => request<PenerimaanDetail>(`/api/penerimaan-barang/detail/${id}`, { token }),
   savePenerimaan: (token: string, input: PenerimaanSaveInput) =>
     request<PenerimaanSaveResult>("/api/penerimaan-barang", { method: "POST", body: input, token }),
+  stokAdjus: (token: string, params: StokAdjusQuery) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: StokAdjus[]; total: number; unfilteredTotal: number; from: string; to: string }>(`/api/stok-farmasi/stok-adjusment?${qs}`, { token });
+  },
+  stokAdjusOptions: (token: string) => request<StokAdjusOptions>("/api/stok-farmasi/stok-adjusment/options", { token }),
+  stokAdjusObat: (token: string, cabang: string) =>
+    request<{ rows: StokAdjusObat[] }>(`/api/stok-farmasi/stok-adjusment/obat?cabang=${encodeURIComponent(cabang)}`, { token }),
+  saveStokAdjus: (token: string, input: StokAdjusSaveInput) =>
+    request<{ id: number; stok: number }>("/api/stok-farmasi/stok-adjusment", { method: "POST", body: input, token }),
   penjualanTindakanOptions: (token: string) =>
     request<{ branches: { kode: string; nama: string }[]; today: string }>("/api/report-klinik/penjualan-tindakan/options", { token }),
   pengobatanDokter: (token: string, cabang: string) =>
@@ -1989,4 +2488,57 @@ export const api = {
     request<Branch>("/api/branches", { method: "POST", body: input, token }),
   updateBranch: (token: string, kode: string, input: BranchInput) =>
     request<Branch>(`/api/branches/${encodeURIComponent(kode)}`, { method: "PUT", body: input, token }),
+  // Stok Farmasi > Analitik
+  analitikOptions: (token: string) => request<AnalitikOptions>("/api/analitik/options", { token }),
+  analitikObat: (token: string, params: { cabang?: string; horizon?: number; leadTime?: number; q?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<AnalitikObatResult>(`/api/analitik/obat?${qs}`, { token });
+  },
+  analitikPenyakit: (token: string, params: { cabang?: string; weeks?: number; top?: number }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<AnalitikPenyakit>(`/api/analitik/penyakit?${qs}`, { token });
+  },
+  analitikDiagnosaObat: (token: string, params: { cabang?: string; icd?: string; horizon?: number }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<AnalitikDiagnosaObatResult>(`/api/analitik/diagnosa-obat?${qs}`, { token });
+  },
+  analitikRingkasan: (token: string, input: { cabang?: string; refresh?: boolean }) =>
+    request<{ text: string; cached: boolean; today: string }>("/api/analitik/ringkasan", { method: "POST", body: input, token }),
+  analitikChat: (token: string, input: { cabang?: string; messages: AnalitikChatMessage[] }) =>
+    request<{ message: AnalitikChatMessage }>("/api/analitik/chat", { method: "POST", body: input, token }),
+  analitikCommand: (token: string, cabang?: string) =>
+    request<AnalitikCommand>(`/api/analitik/command${cabang ? `?cabang=${encodeURIComponent(cabang)}` : ""}`, { token }),
+  analitikKinerja: (token: string, params: { cabang?: string; dari?: string; sampai?: string; kelompok?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: AnalitikKinerja[]; total: AnalitikKinerja; dari: string; sampai: string; kelompok: string }>(`/api/analitik/kinerja?${qs}`, { token });
+  },
+  analitikKualitas: (token: string, cabang?: string) =>
+    request<{ checks: AnalitikCekKualitas[]; maxContoh: number }>(`/api/analitik/kualitas-data${cabang ? `?cabang=${encodeURIComponent(cabang)}` : ""}`, { token }),
+  analitikFollowUp: (token: string, params: { cabang?: string; hari?: number; kelompok?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: AnalitikFollowUp[]; total: number; hari: number; kelompok: { kode: string; nama: string }[] }>(`/api/analitik/follow-up?${qs}`, { token });
+  },
+  saranIcd: (token: string, deskripsi: string) =>
+    request<{ ai: boolean; aiError: string; kandidat: IcdKandidat[] }>("/api/analitik/saran-icd", { method: "POST", body: { deskripsi }, token }),
+
+  // Front Office Klinik > Riwayat Pasien
+  riwayatPasienSearch: (token: string, q: string, page = 1, size = 10) =>
+    request<{ rows: RiwayatPasienHit[]; total: number }>(`/api/riwayat-pasien/pasien?q=${encodeURIComponent(q)}&page=${page}&size=${size}`, { token }),
+  riwayatPasien: (token: string, id: number) => request<RiwayatPasien>(`/api/riwayat-pasien/${id}`, { token }),
+  // MCU result forms
+  mcuRegistrasi: (token: string, form: string, params: { q?: string; from?: string; to?: string; page?: number; size?: number; cancel?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return request<{ rows: McuRegistrasi[]; total: number; from: string; to: string; today: string }>(`/api/mcu/form/${form}/registrasi?${qs}`, { token });
+  },
+  mcuKatalog: (token: string, form: string) => request<{ form: string; title: string; sections: McuSection[] }>(`/api/mcu/form/${form}/katalog`, { token }),
+  mcuHasil: (token: string, form: string, id: number) =>
+    request<{ registrasi: McuRegistrasi; hasil: McuHasil; lab?: McuLabItem[] }>(`/api/mcu/form/${form}/${id}`, { token }),
+  mcuSave: (token: string, form: string, id: number, input: { status: string; kesimpulan: string; values: Record<string, McuValue> }) =>
+    request<{ hasil: McuHasil }>(`/api/mcu/form/${form}/${id}`, { method: "PUT", body: input, token }),
 };

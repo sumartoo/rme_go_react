@@ -37,6 +37,9 @@ type fakeRepo struct {
 	lastDok  string
 	lastX    DiagnosaParams
 	lastK    DinkesParams
+	lastSO   OpnameParams
+	obatFor  string
+	lastTr   TraceParams
 	calls    int
 }
 
@@ -104,6 +107,24 @@ func (f *fakeRepo) TransaksiHarian(_ context.Context, p HarianParams) (HarianPag
 	f.lastH, f.calls = p, f.calls+1
 	return HarianPage{Rows: []HarianRow{{IDJual: 522954, Tgl: "2026-11-20", NoRM: "89-01-31", Pasien: "RISWALDY", Pelayanan: "POLI UMUM", Dokter: "dr. FEBRIMA J 2",
 		Pembayaran: "TUNAI", Obat: 105000, Penunjang: 70000, Total: 175000, Cabang: "KMJ", Status: StatusClose}}, Total: 1, UnfilteredTotal: 1}, nil
+}
+
+func (f *fakeRepo) StokOpname(_ context.Context, p OpnameParams) (OpnamePage, error) {
+	f.lastSO, f.calls = p, f.calls+1
+	return OpnamePage{Rows: []OpnameRow{{IDObat: 3031, Nama: "ATORVASTATIN 10 MG (OTC)", HargaJual: 33000, BeratIsi: "10", Jenis: "OTC", SatuanBeli: "STRIP",
+		SatuanJual: "STRIP", JumUnit: 1, StokMin: 2, Stok: 0, Cabang: "MED", NamaCabang: "KLINIK MEDIKA", IsActive: true}}, Total: 1, UnfilteredTotal: 1}, nil
+}
+
+func (f *fakeRepo) ObatCabang(_ context.Context, branch string) ([]ObatCabang, error) {
+	f.obatFor = branch
+	return []ObatCabang{{ID: 3031, Nama: "ATORVASTATIN 10 MG (OTC)", Jenis: "OTC", Satuan: "STRIP", Stok: 0}}, nil
+}
+
+func (f *fakeRepo) StokTrace(_ context.Context, p TraceParams) (TracePage, error) {
+	f.lastTr, f.calls = p, f.calls+1
+	return TracePage{Rows: []TraceRow{{ID: 914021, IDObat: 1553, Nama: "PARACETAMOL", Cabang: "MED", NamaCabang: "KLINIK MEDIKA", LastStock: 5,
+		InOut: "Out", Byk: 1, Stock: 4, SystemStock: 4, TableRef: "TrxJualObat", Transaksi: "Penjualan Obat", Remarks: "Transaksi 2611MED0768",
+		CreatedBy: "naylul", CreatedDate: "2026-11-19 23:32:10.773"}}, Total: 1, UnfilteredTotal: 1}, nil
 }
 
 func (f *fakeRepo) MovingPO(context.Context) ([]Option, error) {
@@ -182,7 +203,7 @@ func newServer(t *testing.T) *server {
 	mux := http.NewServeMux()
 	h.Routes(mux, tokens.Middleware, requireMenu)
 	// Each report's endpoints are guarded by its own menu item.
-	if len(guarded) != 14 || guarded[PenjualanObatPath] != 2 || guarded[PenjualanTindakanPath] != 2 || guarded[PenjualanPenunjangPath] != 2 ||
+	if len(guarded) != 17 || guarded[StokTracePath] != 2 || guarded[StokOpnamePath] != 2 || guarded[StokAlertPath] != 2 || guarded[PenjualanObatPath] != 2 || guarded[PenjualanTindakanPath] != 2 || guarded[PenjualanPenunjangPath] != 2 ||
 		guarded[PenjualanOTCPath] != 2 || guarded[PasienBaruPath] != 2 || guarded[RekapAsuransiPath] != 2 || guarded[TransaksiHarianPath] != 2 ||
 		guarded[AllStokPath] != 2 || guarded[RujukanPath] != 2 || guarded[PenjualanSoftdrinkPath] != 2 ||
 		guarded[PendaftaranPath] != 2 || guarded[PendapatanPath] != 3 || guarded[DiagnosaPath] != 2 || guarded[DinkesPath] != 2 {
@@ -511,6 +532,97 @@ func TestAllStok(t *testing.T) {
 	code, out = s.get(t, csID, "/api/report-klinik/all-stok/options")
 	if code != http.StatusOK || out["today"] != "2026-11-19" || len(out["jenis"].([]any)) != 2 || len(out["movingPo"].([]any)) != 2 {
 		t.Errorf("options: %d %v", code, out)
+	}
+}
+
+func TestStokOpname(t *testing.T) {
+	s := newServer(t)
+	code, out := s.get(t, csID, "/api/stok-farmasi/stok-opname")
+	p := s.repo.lastSO
+	if code != http.StatusOK || strings.Join(p.Branches, ",") != "KMJ,MED" || p.Sort != "idObat" || p.Desc || p.Limit != 10 || p.Aktif != nil {
+		t.Fatalf("default (by kode): %d %v %+v", code, out, p)
+	}
+	if rows := out["rows"].([]any); len(rows) != 1 || rows[0].(map[string]any)["satuanJual"] != "STRIP" || rows[0].(map[string]any)["stokMin"] != 2.0 {
+		t.Errorf("rows: %v", out["rows"])
+	}
+	s.get(t, csID, "/api/stok-farmasi/stok-opname?cabang=med&nama=+ator+&jenis=3&aktif=0&q=3031&sort=stok&dir=desc&size=25&page=2")
+	p = s.repo.lastSO
+	if strings.Join(p.Branches, ",") != "MED" || p.Nama != "ator" || p.IDJenis == nil || *p.IDJenis != 3 || p.Aktif == nil || *p.Aktif ||
+		p.Search != "3031" || p.Sort != "stok" || !p.Desc || p.Offset != 25 {
+		t.Errorf("filtered: %+v", p)
+	}
+	before := s.repo.calls
+	if code, _ := s.get(t, csID, "/api/stok-farmasi/stok-opname?cabang=CTM"); code != http.StatusForbidden {
+		t.Errorf("other branch: %d, want 403", code)
+	}
+	if code, out := s.get(t, loneID, "/api/stok-farmasi/stok-opname"); code != http.StatusOK || out["total"] != 0.0 || s.repo.calls != before {
+		t.Errorf("rejected or branchless requests: %d %v", code, out)
+	}
+	code, out = s.get(t, csID, "/api/stok-farmasi/stok-opname/options")
+	if code != http.StatusOK || len(out["jenis"].([]any)) != 2 || len(out["branches"].([]any)) != 2 {
+		t.Errorf("options: %d %v", code, out)
+	}
+}
+
+func TestMinimStok(t *testing.T) {
+	s := newServer(t)
+	code, out := s.get(t, csID, "/api/stok-farmasi/stok-alert/minim-stok")
+	p := s.repo.lastSO
+	if code != http.StatusOK || !p.BelowMin || p.Sort != "nama" || p.Desc || strings.Join(p.Branches, ",") != "KMJ,MED" {
+		t.Fatalf("default (below minimum, by name): %d %v %+v", code, out, p)
+	}
+	s.get(t, csID, "/api/stok-farmasi/stok-opname")
+	if s.repo.lastSO.BelowMin {
+		t.Errorf("stok opname must list every row")
+	}
+	if code, _ := s.get(t, csID, "/api/stok-farmasi/stok-alert/minim-stok?cabang=CTM"); code != http.StatusForbidden {
+		t.Errorf("other branch: %d", code)
+	}
+	if code, out := s.get(t, csID, "/api/stok-farmasi/stok-alert/options"); code != http.StatusOK || len(out["branches"].([]any)) != 2 {
+		t.Errorf("options: %d %v", code, out)
+	}
+}
+
+func TestStokTraceObat(t *testing.T) {
+	s := newServer(t)
+	if code, out := s.get(t, csID, "/api/stok-farmasi/stok-trace/obat?cabang=med"); code != http.StatusOK || s.repo.obatFor != "MED" || len(out["rows"].([]any)) != 1 {
+		t.Errorf("obat: %d %v", code, out)
+	}
+	if code, _ := s.get(t, csID, "/api/stok-farmasi/stok-trace/obat"); code != http.StatusBadRequest {
+		t.Errorf("no cabang: %d", code)
+	}
+	if code, _ := s.get(t, csID, "/api/stok-farmasi/stok-trace/obat?cabang=CTM"); code != http.StatusForbidden {
+		t.Errorf("other branch: %d", code)
+	}
+}
+
+func TestStokTrace(t *testing.T) {
+	s := newServer(t)
+	code, out := s.get(t, csID, "/api/stok-farmasi/stok-trace?cabang=med&obat=1553&from=2026-10-27&to=2026-11-19")
+	p := s.repo.lastTr
+	if code != http.StatusOK || p.Cabang != "MED" || p.IDObat == nil || *p.IDObat != 1553 || p.From != "2026-10-27" || p.To != "2026-11-19" ||
+		p.Sort != "id" || p.Desc || p.Limit != 10 {
+		t.Fatalf("default (oldest first): %d %v %+v", code, out, p)
+	}
+	if rows := out["rows"].([]any); len(rows) != 1 || rows[0].(map[string]any)["transaksi"] != "Penjualan Obat" || rows[0].(map[string]any)["lastStock"] != 5.0 {
+		t.Errorf("rows: %v", out["rows"])
+	}
+	s.get(t, csID, "/api/stok-farmasi/stok-trace?cabang=KMJ&obat=0&q=x&sort=stock&dir=desc&size=25&page=2")
+	if p = s.repo.lastTr; p.Cabang != "KMJ" || p.IDObat != nil || p.From != "2026-11-19" || p.Search != "x" || p.Sort != "stock" || !p.Desc || p.Offset != 25 {
+		t.Errorf("every drug, today: %+v", p)
+	}
+	before := s.repo.calls
+	for path, want := range map[string]int{
+		"/api/stok-farmasi/stok-trace":                                          http.StatusBadRequest,
+		"/api/stok-farmasi/stok-trace?cabang=CTM":                               http.StatusForbidden,
+		"/api/stok-farmasi/stok-trace?cabang=MED&from=2026-11-10&to=2026-11-01": http.StatusBadRequest,
+	} {
+		if code, _ := s.get(t, csID, path); code != want {
+			t.Errorf("%s: %d, want %d", path, code, want)
+		}
+	}
+	if code, _ := s.get(t, loneID, "/api/stok-farmasi/stok-trace?cabang=MED"); code != http.StatusForbidden || s.repo.calls != before {
+		t.Errorf("branchless user: %d", code)
 	}
 }
 

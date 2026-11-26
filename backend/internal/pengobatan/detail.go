@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/example/be_jwt_golang/backend/internal/pendaftaran"
+	"github.com/example/be_jwt_golang/backend/internal/stoklog"
 )
 
 // DetailObat is a drug line of a saved sale, as the form's Obat tab shows it.
@@ -204,10 +205,10 @@ func (p *PostgresRepository) Cancel(ctx context.Context, id int, reason, user st
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op after Commit
 
-	var cabang string
+	var cabang, noKwi string
 	var status *int
-	err = tx.QueryRow(ctx, `SELECT COALESCE(j.cabang, ''), t.status FROM trxjual j
-		LEFT JOIN trxjualtotal t ON t.id_jual = j.id WHERE j.id = $1 FOR UPDATE OF j`, id).Scan(&cabang, &status)
+	err = tx.QueryRow(ctx, `SELECT COALESCE(j.cabang, ''), COALESCE(j.no_kwi, ''), t.status FROM trxjual j
+		LEFT JOIN trxjualtotal t ON t.id_jual = j.id WHERE j.id = $1 FOR UPDATE OF j`, id).Scan(&cabang, &noKwi, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrSaleNotFound
 	}
@@ -225,10 +226,40 @@ func (p *PostgresRepository) Cancel(ctx context.Context, id int, reason, user st
 		id, SaleStatusCancel, user, reason); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE trxstock s SET stok = COALESCE(s.stok, 0) + x.byk
-		FROM (SELECT id_obat, sum(COALESCE(byk, 0)) AS byk FROM trxjualobat WHERE id_jual = $1 GROUP BY id_obat) x
-		WHERE s.id_obat = x.id_obat AND s.cabang = $2`, id, cabang); err != nil {
+	rows, err := tx.Query(ctx, `SELECT id_obat, sum(COALESCE(byk, 0)) FROM trxjualobat WHERE id_jual = $1 GROUP BY id_obat ORDER BY id_obat`, id)
+	if err != nil {
 		return err
+	}
+	type back struct {
+		idObat int
+		byk    float64
+	}
+	backs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (back, error) {
+		var b back
+		err := r.Scan(&b.idObat, &b.byk)
+		return b, err
+	})
+	if err != nil {
+		return err
+	}
+	ket := "Cancel Transaksi " + noKwi
+	if k := []rune(ket); len(k) > 60 { // trxstokadjus.ket is varchar(60)
+		ket = string(k[:60])
+	}
+	for _, b := range backs {
+		if b.byk == 0 {
+			continue
+		}
+		var idAdjus int
+		if err := tx.QueryRow(ctx, `INSERT INTO trxstokadjus (tanggal, id_obat, ket, byk, status, create_user, create_date, update_user, update_date, cabang)
+			VALUES (`+now+`::date, $1, $2, $3, 1, $4, `+now+`, $4, `+now+`, $5) RETURNING id`,
+			b.idObat, ket, b.byk, user, cabang).Scan(&idAdjus); err != nil {
+			return err
+		}
+		if _, _, err := stoklog.Move(ctx, tx, stoklog.Entry{IDObat: b.idObat, Cabang: cabang, Delta: b.byk,
+			TableRef: stoklog.RefAdjusCancel, IDRef: idAdjus, Remarks: ket, User: user}); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }

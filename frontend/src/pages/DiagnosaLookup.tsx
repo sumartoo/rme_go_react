@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from "react";
-import { SquareCheck, X } from "lucide-react";
-import { api, ApiError, PengobatanIcd } from "../api";
+import { FormEvent, useCallback, useRef, useState } from "react";
+import { Sparkles, SquareCheck, X } from "lucide-react";
+import { api, ApiError, IcdKandidat, PengobatanIcd } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import DataTable, { Column, RemoteQuery } from "../components/DataTable";
 import { useModal } from "../components/FormKit";
@@ -93,6 +93,7 @@ export default function DiagnosaLookup({
             {error}
           </p>
         )}
+        <SaranIcd chosen={chosen} onPick={pick} />
         <DataTable
           title="Data Diagnosa"
           columns={columns}
@@ -111,5 +112,102 @@ export default function DiagnosaLookup({
         </button>
       </footer>
     </dialog>
+  );
+}
+
+/**
+ * "Saran ICD": the doctor describes the case in words and gets candidate codes
+ * from the ICD master — the AI's (with a reason) when the backend has an AI
+ * key, then plain search matches. Only the description is sent, and the
+ * doctor still picks the code.
+ */
+function SaranIcd({ chosen, onPick }: { chosen: Set<number>; onPick: (d: PengobatanIcd) => void }) {
+  const { token, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<{ ai: boolean; aiError: string; kandidat: IcdKandidat[] } | null>(null);
+  const [error, setError] = useState("");
+
+  const ask = (e: FormEvent) => {
+    e.preventDefault();
+    if (!token || text.trim().length < 3) {
+      setError("Tulis deskripsi klinis minimal 3 karakter.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    api
+      .saranIcd(token, text.trim())
+      .then(setRes)
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) logout("Your session has expired. Please log in again.");
+        else setError(err instanceof ApiError ? Object.values(err.fieldErrors)[0] ?? err.message : "Gagal mencari saran ICD");
+      })
+      .finally(() => setBusy(false));
+  };
+
+  if (!open) {
+    return (
+      <p>
+        <button type="button" className="btn-add" onClick={() => setOpen(true)}>
+          <Sparkles aria-hidden="true" /> Saran ICD dari deskripsi
+        </button>
+      </p>
+    );
+  }
+  return (
+    <section className="icd-saran" aria-label="Saran ICD">
+      <form onSubmit={ask} className="icd-saran-form">
+        <textarea
+          className="select"
+          rows={2}
+          maxLength={500}
+          value={text}
+          placeholder="Deskripsi klinis, mis. batuk pilek 3 hari, demam, nyeri tenggorokan"
+          aria-label="Deskripsi klinis"
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button type="submit" className="btn-add" disabled={busy}>
+          <Sparkles aria-hidden="true" /> {busy ? "Mencari…" : "Cari saran"}
+        </button>
+      </form>
+      {error && (
+        <p className="alert error" role="alert">
+          {error}
+        </p>
+      )}
+      {res && (
+        <>
+          {res.aiError && <p className="muted">{res.aiError}</p>}
+          {res.kandidat.length === 0 ? (
+            <p className="muted">Tidak ada kode yang cocok. Coba deskripsi lain atau cari di tabel di bawah.</p>
+          ) : (
+            <ul className="icd-saran-list">
+              {res.kandidat.map((k) => (
+                <li key={k.id}>
+                  <button
+                    type="button"
+                    className="icd-saran-item"
+                    disabled={chosen.has(k.id)}
+                    onClick={() => onPick({ id: k.id, kode: k.kode, nama: k.nama, jenis: k.jenis })}
+                  >
+                    <span>
+                      <strong>{k.kode}</strong> {k.nama}
+                      {k.sumber === "ai" && <span className="chip icd-ai-chip">AI</span>}
+                    </span>
+                    {k.alasan && <span className="muted">{k.alasan}</span>}
+                    {chosen.has(k.id) && <span className="muted">Sudah dipilih</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="muted an-foot">
+            Saran untuk ditinjau dokter, bukan diagnosis. {res.ai ? "Hanya teks deskripsi yang dikirim ke AI, tanpa identitas pasien." : ""}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
